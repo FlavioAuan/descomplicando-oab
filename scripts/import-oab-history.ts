@@ -14,9 +14,49 @@
 
 import fs from 'fs'
 import path from 'path'
-import Anthropic from '@anthropic-ai/sdk'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
+
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
+
+function getAIHeaders(): Record<string, string> {
+  const apiKey = process.env.OPENROUTER_API_KEY
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY not set')
+  return {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': 'https://descomplicandoab.vercel.app',
+    'X-Title': 'DescomplicandOAB',
+  }
+}
+
+function getAIModel(): string {
+  return process.env.OPENROUTER_MODEL ?? 'openrouter/auto'
+}
+
+async function callAI(prompt: string, systemPrompt?: string, maxTokens = 4096): Promise<string> {
+  const messages: { role: string; content: string }[] = []
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+  messages.push({ role: 'user', content: prompt })
+
+  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    method: 'POST',
+    headers: getAIHeaders(),
+    body: JSON.stringify({
+      model: getAIModel(),
+      messages,
+      max_tokens: maxTokens,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`OpenRouter ${res.status}: ${body}`)
+  }
+
+  const data = await res.json()
+  return (data.choices?.[0]?.message?.content as string) ?? ''
+}
 
 // ─── Load env ─────────────────────────────────────────────────────────────────
 const envPath = path.join(process.cwd(), '.env.local')
@@ -480,7 +520,6 @@ Direito Financeiro, Filosofia do Direito, Estatuto da Criança e do Adolescente 
 `.trim()
 
 async function classifyBatch(
-  client: Anthropic,
   questions: Array<{ id: string; number: number; statement: string; alternatives: { a: string; b: string; c: string; d: string } }>
 ): Promise<Record<string, Classification>> {
   const prompt = `Você é um classificador especializado em questões jurídicas da OAB.
@@ -498,13 +537,7 @@ Responda APENAS com JSON válido no formato:
   ...
 }`
 
-  const msg = await client.messages.create({
-    model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = msg.content[0].type === 'text' ? msg.content[0].text : ''
+  const text = await callAI(prompt, undefined, 4096)
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('No JSON in classification response')
 
@@ -518,12 +551,10 @@ async function phase2(rawExams: RawExam[]): Promise<ClassifiedExam[]> {
     return existing
   }
 
-  log('Phase 2: Classifying questions with Claude AI...')
+  log('Phase 2: Classifying questions with AI...')
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set')
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
 
-  const client = new Anthropic({ apiKey })
   const classified: ClassifiedExam[] = JSON.parse(JSON.stringify(rawExams)) as ClassifiedExam[]
 
   // Collect all questions needing classification
@@ -546,7 +577,7 @@ async function phase2(rawExams: RawExam[]): Promise<ClassifiedExam[]> {
     log(`  Classifying batch ${Math.floor(i / BATCH) + 1}/${Math.ceil(allQs.length / BATCH)} (${batch.length} questions)...`)
 
     try {
-      const results = await classifyBatch(client, batch)
+      const results = await classifyBatch(batch)
 
       for (const item of batch) {
         const cls = results[item.id]
@@ -671,10 +702,7 @@ async function phase3(classified: ClassifiedExam[]): Promise<{ stats: SubjectSta
 
   // ── Predictions ──────────────────────────────────────────────────────────────
 
-  log('  Generating predictions with Claude...')
-
-  const apiKey = process.env.ANTHROPIC_API_KEY!
-  const client = new Anthropic({ apiKey })
+  log('  Generating predictions with AI...')
 
   const statsContext = stats.map(s =>
     `${s.name}: ${s.totalQuestions} questões históricas (${s.percentageHistorical.toFixed(1)}%), média ${s.avgPerExam.toFixed(1)}/prova, trend: ${s.trend}, presença: ${s.presenceInExams}/${totalExams} provas`
@@ -729,19 +757,13 @@ Responda APENAS com JSON válido:
   let predictions: Prediction[] = []
 
   try {
-    const msg = await client.messages.create({
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 8192,
-      messages: [{ role: 'user', content: predPrompt }],
-    })
-
-    const text = msg.content[0].type === 'text' ? msg.content[0].text : ''
+    const text = await callAI(predPrompt, undefined, 8192)
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (jsonMatch) {
       predictions = JSON.parse(jsonMatch[0]) as Prediction[]
     }
   } catch (err) {
-    log(`  Predictions Claude call failed: ${err}`)
+    log(`  Predictions AI call failed: ${err}`)
   }
 
   const analysis = { stats, predictions }

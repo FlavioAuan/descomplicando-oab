@@ -2,7 +2,7 @@ import { db } from '@/lib/db'
 import { exams, examQuestions, importHistory } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { createServiceClient } from '@/lib/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { callClaudeJSON } from '@/lib/ai/claude'
 
 export interface ImportedExam {
   examNumber: number
@@ -303,14 +303,10 @@ export async function parseExamWithClaude(
   text: string,
   examInfo: string
 ): Promise<ParsedQuestion[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return []
+  if (!process.env.OPENROUTER_API_KEY) return []
 
-  const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'
-  const client = new Anthropic({ apiKey })
-
-  // Truncate text to avoid token limits — send first 60k chars
-  const truncated = text.length > 60000 ? text.substring(0, 60000) + '\n[TEXTO TRUNCADO]' : text
+  const truncated =
+    text.length > 60000 ? text.substring(0, 60000) + '\n[TEXTO TRUNCADO]' : text
 
   const systemPrompt = `Você é um extrator de questões de provas da OAB (Exame da Ordem dos Advogados do Brasil).
 Sua tarefa é analisar o texto bruto extraído de um PDF de prova e retornar TODAS as questões encontradas em formato JSON válido.
@@ -320,39 +316,19 @@ Retorne APENAS um array JSON, sem markdown, sem explicações adicionais.`
 Cada questão deve ter: number (inteiro), statement (enunciado completo), alternatives (objeto com a, b, c, d como strings).
 
 Formato de resposta (array JSON):
-[
-  {
-    "number": 1,
-    "statement": "enunciado da questão...",
-    "alternatives": {
-      "a": "texto da alternativa A",
-      "b": "texto da alternativa B",
-      "c": "texto da alternativa C",
-      "d": "texto da alternativa D"
-    }
-  }
-]
+[{"number":1,"statement":"enunciado...","alternatives":{"a":"texto A","b":"texto B","c":"texto C","d":"texto D"}}]
 
 TEXTO DA PROVA:
 ${truncated}`
 
   try {
-    const message = await client.messages.create({
-      model,
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
-
-    const content = message.content[0]
-    if (content.type !== 'text') return []
-
-    const raw = content.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed = JSON.parse(raw) as Array<{
-      number: number
-      statement: string
-      alternatives: { a: string; b: string; c: string; d: string }
-    }>
+    const parsed = await callClaudeJSON<
+      Array<{
+        number: number
+        statement: string
+        alternatives: { a: string; b: string; c: string; d: string }
+      }>
+    >(userPrompt, systemPrompt, { maxTokens: 8192 })
 
     return parsed.map((q) => ({
       number: q.number,
