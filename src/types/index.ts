@@ -138,7 +138,7 @@ export interface Simulation {
   totalQuestions: number
   timeLimitMinutes?: number | null
   trainingId?: string | null
-  isAdaptive: boolean
+  isAdaptive: boolean | null
   createdBy?: string | null
   createdAt: Date
 }

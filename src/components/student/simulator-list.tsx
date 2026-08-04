@@ -20,15 +20,15 @@ type Simulation = {
   type: string
   totalQuestions: number
   timeLimitMinutes: number | null
-  isAdaptive: boolean
+  isAdaptive: boolean | null
 }
 
 type CompletedSim = {
   id: string
   simulationId: string
-  percentage: number
-  totalCorrect: number
-  totalAnswered: number
+  percentage: number | null
+  totalCorrect: number | null
+  totalAnswered: number | null
   startedAt: Date
 }
 
@@ -88,7 +88,7 @@ export function SimulatorList({ simulations, completed, subjects, userId }: Simu
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {simulations.map(sim => {
             const completedResult = completedMap.get(sim.id)
-            const passed = completedResult && completedResult.percentage >= 0.6
+            const passed = completedResult && (completedResult.percentage ?? 0) >= 0.6
 
             return (
               <Card key={sim.id} className="flex flex-col">
@@ -97,7 +97,7 @@ export function SimulatorList({ simulations, completed, subjects, userId }: Simu
                     <CardTitle className="text-base line-clamp-2">{sim.name}</CardTitle>
                     {completedResult && (
                       <Badge className={passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                        {formatPercent(completedResult.percentage)}
+                        {formatPercent(completedResult.percentage ?? 0)}
                       </Badge>
                     )}
                   </div>
@@ -125,7 +125,7 @@ export function SimulatorList({ simulations, completed, subjects, userId }: Simu
                   {completedResult && (
                     <div className="text-xs text-gray-400">
                       Última tentativa: {formatDate(completedResult.startedAt)} ·{' '}
-                      {completedResult.totalCorrect}/{completedResult.totalAnswered}
+                      {completedResult.totalCorrect ?? 0}/{completedResult.totalAnswered ?? 0}
                     </div>
                   )}
 
@@ -164,20 +164,20 @@ export function SimulatorList({ simulations, completed, subjects, userId }: Simu
                 >
                   <div>
                     <p className="font-medium text-gray-700">
-                      {result.totalAnswered} questões
+                      {result.totalAnswered ?? 0} questões
                     </p>
                     <p className="text-xs text-gray-400">{formatDate(result.startedAt)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-gray-600">
-                      {result.totalCorrect}/{result.totalAnswered}
+                      {result.totalCorrect ?? 0}/{result.totalAnswered ?? 0}
                     </span>
                     <Badge className={
-                      result.percentage >= 0.6
+                      (result.percentage ?? 0) >= 0.6
                         ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
                     }>
-                      {formatPercent(result.percentage)}
+                      {formatPercent(result.percentage ?? 0)}
                     </Badge>
                   </div>
                 </div>
