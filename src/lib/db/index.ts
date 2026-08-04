@@ -2,11 +2,24 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-const connectionString = process.env.DATABASE_URL!
+// Lazy singleton — avoids URL parsing at module import time during Next.js build
+let _client: ReturnType<typeof postgres> | null = null
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 
-// Disable prefetch as it is not supported for "Transaction" pool mode
-const client = postgres(connectionString, { prepare: false })
-export const db = drizzle(client, { schema })
+function getDb() {
+  if (!_db) {
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) throw new Error('DATABASE_URL env var is not set')
+    _client = postgres(connectionString, { prepare: false })
+    _db = drizzle(_client, { schema })
+  }
+  return _db
+}
+
+export const db: ReturnType<typeof drizzle<typeof schema>> = new Proxy(
+  {} as ReturnType<typeof drizzle<typeof schema>>,
+  { get: (_, prop) => Reflect.get(getDb(), prop) }
+)
 
 export type DB = typeof db
 export * from './schema'

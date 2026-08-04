@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/server/actions/auth'
 import { generatePredictions } from '@/lib/ai/generate'
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       predictions: generatedPredictions,
-      generatedFor: `${nextExamNumber}º Exame`,
+      generatedFor: `${nextExamNumber}Âº Exame`,
     })
   } catch (error) {
     console.error('Predictions error:', error)

@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { requireUser } from '@/server/actions/auth'
 import { answerWithRag } from '@/lib/ai/rag'
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     })
 
     const historySection = conversationHistory?.length
-      ? '\n\nHistórico:\n' +
+      ? '\n\nHistÃ³rico:\n' +
         conversationHistory
           .slice(-6)
           .map((h: { role: string; content: string }) =>
@@ -42,12 +43,12 @@ export async function POST(req: NextRequest) {
       : ''
 
     const contextSection = ragContext
-      ? `\n\nContexto jurídico relevante:\n${ragContext}`
+      ? `\n\nContexto jurÃ­dico relevante:\n${ragContext}`
       : ''
 
     const prompt = `${historySection}${contextSection}\n\nAluno: ${message}`
 
-    const systemPrompt = `Você é um tutor jurídico especializado na OAB (1ª fase). Responda de forma didática, citando artigos e jurisprudência quando relevante. Use markdown para formatação.`
+    const systemPrompt = `VocÃª Ã© um tutor jurÃ­dico especializado na OAB (1Âª fase). Responda de forma didÃ¡tica, citando artigos e jurisprudÃªncia quando relevante. Use markdown para formataÃ§Ã£o.`
 
     const streamBody = new ReadableStream({
       async start(controller) {

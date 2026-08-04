@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/server/actions/auth'
 import { classifyBatch } from '@/lib/ai/classify'

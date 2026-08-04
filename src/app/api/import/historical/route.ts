@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { requireRole } from '@/server/actions/auth'
 import {
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
         const mockExams = generateMockOABData()
 
         importId = await createImportRecord({
-          source: 'Importação Manual - Base OAB',
+          source: 'ImportaÃ§Ã£o Manual - Base OAB',
           importedBy: 'system',
         })
 
@@ -52,11 +53,11 @@ export async function POST(req: NextRequest) {
 
           send({
             status: 'running',
-            message: `Importando OAB ${exam.examNumber}ª Exame (${exam.year})...`,
+            message: `Importando OAB ${exam.examNumber}Âª Exame (${exam.year})...`,
             examsFound: mockExams.length,
             examsImported: i,
             questionsImported: totalQuestions,
-            currentExam: `OAB ${exam.examNumber}ª (${exam.year})`,
+            currentExam: `OAB ${exam.examNumber}Âª (${exam.year})`,
           })
 
           const { questionCount } = await importExamToDatabase(exam, importId)
@@ -71,12 +72,12 @@ export async function POST(req: NextRequest) {
           status: 'completed',
           countExams: totalExams,
           countQuestions: totalQuestions,
-          notes: `Importação concluída com sucesso em ${new Date().toISOString()}`,
+          notes: `ImportaÃ§Ã£o concluÃ­da com sucesso em ${new Date().toISOString()}`,
         })
 
         send({
           status: 'completed',
-          message: 'Importação concluída!',
+          message: 'ImportaÃ§Ã£o concluÃ­da!',
           examsFound: mockExams.length,
           examsImported: totalExams,
           questionsImported: totalQuestions,
@@ -120,9 +121,9 @@ export async function POST(req: NextRequest) {
 function generateMockOABData() {
   const exams = []
   const disciplines = [
-    'Ética', 'Constitucional', 'Civil', 'Processo Civil',
+    'Ã‰tica', 'Constitucional', 'Civil', 'Processo Civil',
     'Penal', 'Processo Penal', 'Trabalho', 'Empresarial',
-    'Tributário', 'Administrativo'
+    'TributÃ¡rio', 'Administrativo'
   ]
 
   for (let examNum = 1; examNum <= 42; examNum++) {
@@ -133,12 +134,12 @@ function generateMockOABData() {
       const disc = disciplines[q % disciplines.length]
       questions.push({
         number: q,
-        statement: `Questão ${q} do ${examNum}º Exame da OAB (${year}) sobre ${disc}. Enunciado da questão sobre tema específico de ${disc}.`,
+        statement: `QuestÃ£o ${q} do ${examNum}Âº Exame da OAB (${year}) sobre ${disc}. Enunciado da questÃ£o sobre tema especÃ­fico de ${disc}.`,
         alternatives: {
-          a: `Alternativa A - opção correta sobre ${disc}`,
-          b: `Alternativa B - opção incorreta sobre ${disc}`,
-          c: `Alternativa C - opção incorreta sobre ${disc}`,
-          d: `Alternativa D - opção incorreta sobre ${disc}`,
+          a: `Alternativa A - opÃ§Ã£o correta sobre ${disc}`,
+          b: `Alternativa B - opÃ§Ã£o incorreta sobre ${disc}`,
+          c: `Alternativa C - opÃ§Ã£o incorreta sobre ${disc}`,
+          d: `Alternativa D - opÃ§Ã£o incorreta sobre ${disc}`,
         },
         correctAnswer: 'a',
       })
