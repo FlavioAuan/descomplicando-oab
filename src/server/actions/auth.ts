@@ -16,10 +16,14 @@ const registerSchema = loginSchema.extend({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
 })
 
+function stripBom(s: string) {
+  return s.replace(/^﻿/, '').trim()
+}
+
 function getAdminClient() {
   return createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!),
+    stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY!)
   )
 }
 
@@ -35,13 +39,27 @@ export async function login(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email: validated.data.email,
     password: validated.data.password,
   })
 
   if (error) {
     return { error: 'Credenciais inválidas. Verifique seu email e senha.' }
+  }
+
+  // Ensure user record exists in our users table (may be missing if created via admin API)
+  if (signInData.user) {
+    const existing = await usersRepository.findByAuthId(signInData.user.id)
+    if (!existing) {
+      try {
+        await usersRepository.create({
+          authId: signInData.user.id,
+          email: validated.data.email,
+          name: signInData.user.user_metadata?.name ?? validated.data.email.split('@')[0],
+        })
+      } catch { /* ignore if already exists */ }
+    }
   }
 
   revalidatePath('/', 'layout')
