@@ -48,7 +48,7 @@ export function TrainingApprovalFlow({ training }: TrainingApprovalFlowProps) {
 
     const result = await updateTrainingStatus(training.id, config.next)
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error)
     } else {
       toast.success(
