@@ -43,3 +43,9 @@ drizzle/
 
 # Supabase temp
 supabase/.temp/
+
+# Claude Code session files
+.claude/
+
+# OAB pipeline PDFs (large files, not needed in repo)
+scripts/data/pdfs/

@@ -12,11 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Bell, LogOut, User as UserIcon, ChevronDown } from 'lucide-react'
+import { Bell, LogOut, User as UserIcon, ChevronDown, Menu } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
   user: User
+  onMenuClick?: () => void
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -25,7 +26,7 @@ const ROLE_LABELS: Record<string, string> = {
   student: 'Aluno',
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, onMenuClick }: HeaderProps) {
   const initials = user.name
     .split(' ')
     .slice(0, 2)
@@ -34,11 +35,25 @@ export function Header({ user }: HeaderProps) {
     .toUpperCase()
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <div />
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+      {/* Left: hamburger */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onMenuClick}
+        className="w-8 h-8 text-gray-500 hover:text-gray-800"
+        aria-label="Abrir/fechar menu"
+      >
+        <Menu className="w-5 h-5" />
+      </Button>
 
+      {/* Right: notifications + user */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative w-8 h-8 text-gray-500 hover:text-gray-800">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative w-8 h-8 text-gray-500 hover:text-gray-800"
+        >
           <Bell className="w-4 h-4" />
         </Button>
 
@@ -63,7 +78,9 @@ export function Header({ user }: HeaderProps) {
                 <div className="text-sm font-semibold text-gray-800 leading-tight">
                   {user.name.split(' ')[0]}
                 </div>
-                <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[user.role]}</div>
+                <div className="text-xs text-gray-400 leading-tight">
+                  {ROLE_LABELS[user.role]}
+                </div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-gray-400 hidden md:block" />
             </Button>
@@ -75,7 +92,10 @@ export function Header({ user }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/student/profile" className="flex items-center gap-2 cursor-pointer">
+              <Link
+                href="/student/profile"
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <UserIcon className="w-4 h-4" />
                 Meu perfil
               </Link>

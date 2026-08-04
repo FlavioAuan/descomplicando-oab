@@ -13,7 +13,6 @@ import {
   GraduationCap,
   Users,
   Settings,
-  Upload,
   Zap,
   Trophy,
   ClipboardList,
@@ -21,10 +20,14 @@ import {
   BookMarked,
   AlertCircle,
   Scale,
+  X,
+  HelpCircle,
 } from 'lucide-react'
 
 interface SidebarProps {
   user: User
+  isOpen: boolean
+  onToggle: () => void
 }
 
 const studentLinks = [
@@ -41,6 +44,7 @@ const adminLinks = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/trainings', icon: GraduationCap, label: 'Treinamentos' },
   { href: '/admin/exams', icon: FileText, label: 'Provas' },
+  { href: '/admin/questions', icon: HelpCircle, label: 'Questões' },
   { href: '/admin/materials', icon: BookOpen, label: 'Materiais' },
   { href: '/admin/statistics', icon: BarChart3, label: 'Estatísticas' },
   { href: '/admin/users', icon: Users, label: 'Alunos' },
@@ -48,11 +52,11 @@ const adminLinks = [
 
 const superAdminLinks = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/super-admin/import', icon: Upload, label: 'Importação Histórica' },
   { href: '/super-admin/classify', icon: Zap, label: 'Classificação IA' },
   { href: '/super-admin/predictions', icon: Brain, label: 'Previsões' },
   { href: '/admin/trainings', icon: GraduationCap, label: 'Treinamentos' },
   { href: '/admin/exams', icon: FileText, label: 'Provas' },
+  { href: '/admin/questions', icon: HelpCircle, label: 'Questões' },
   { href: '/admin/materials', icon: BookMarked, label: 'Materiais' },
   { href: '/admin/users', icon: Users, label: 'Usuários' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações' },
@@ -70,39 +74,68 @@ function getLinks(role: string) {
   return studentLinks
 }
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const links = getLinks(user.role)
 
   return (
-    <aside className="w-64 flex flex-col" style={{ backgroundColor: '#111827' }}>
+    <aside
+      className={cn(
+        'fixed inset-y-0 left-0 z-30 flex flex-col w-64 transition-all duration-300 ease-in-out',
+        'md:relative md:inset-auto md:z-auto md:flex-shrink-0',
+        isOpen
+          ? 'translate-x-0 md:w-64'
+          : '-translate-x-full md:translate-x-0 md:w-16'
+      )}
+      style={{ backgroundColor: '#111827' }}
+    >
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center gap-3">
+      <div className="px-4 py-5 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+        <Link
+          href="/dashboard"
+          className={cn(
+            'flex items-center gap-3 min-w-0',
+            !isOpen && 'md:justify-center'
+          )}
+        >
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: '#C9A227' }}
           >
             <Scale className="w-5 h-5 text-gray-900" />
           </div>
-          <div>
-            <div className="text-white font-bold text-sm leading-tight">DescomplicandOAB</div>
-            <div className="text-xs leading-tight" style={{ color: '#C9A227' }}>
+          <div className={cn('min-w-0', !isOpen && 'md:hidden')}>
+            <div className="text-white font-bold text-sm leading-tight truncate">
+              DescomplicandOAB
+            </div>
+            <div className="text-xs leading-tight truncate" style={{ color: '#C9A227' }}>
               Treinamento para a OAB
             </div>
           </div>
         </Link>
+
+        {/* Close button — mobile only */}
+        <button
+          onClick={onToggle}
+          className="md:hidden flex-shrink-0 p-1 rounded text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label="Fechar menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
-      {/* Section Label */}
-      <div className="px-5 pt-5 pb-2">
-        <span className="text-xs font-semibold tracking-widest" style={{ color: '#6B7280' }}>
+      {/* Section label */}
+      <div className={cn('px-5 pt-5 pb-2 flex-shrink-0', !isOpen && 'md:hidden')}>
+        <span
+          className="text-xs font-semibold tracking-widest"
+          style={{ color: '#6B7280' }}
+        >
           {ROLE_SECTION[user.role] ?? 'NAVEGAÇÃO'}
         </span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 pb-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-2 pb-4 space-y-0.5 overflow-y-auto">
         {links.map((link) => {
           const isActive =
             pathname === link.href ||
@@ -112,31 +145,36 @@ export function Sidebar({ user }: SidebarProps) {
             <Link
               key={link.href}
               href={link.href}
+              title={!isOpen ? link.label : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                !isOpen && 'md:justify-center md:px-2',
                 isActive
                   ? 'text-gray-900 shadow-md'
                   : 'text-gray-400 hover:text-white hover:bg-white/8'
               )}
               style={
-                isActive
-                  ? { backgroundColor: '#C9A227', color: '#111827' }
-                  : {}
+                isActive ? { backgroundColor: '#C9A227', color: '#111827' } : {}
               }
             >
               <link.icon
                 className="w-4 h-4 flex-shrink-0"
                 style={isActive ? { color: '#111827' } : {}}
               />
-              {link.label}
+              <span className={cn(!isOpen && 'md:hidden')}>{link.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* User info at bottom */}
-      <div className="px-4 py-4 border-t border-white/10">
-        {user.role === 'student' && (
+      {/* User info */}
+      <div
+        className={cn(
+          'px-4 py-4 border-t border-white/10 flex-shrink-0',
+          !isOpen && 'md:flex md:justify-center md:px-2'
+        )}
+      >
+        {user.role === 'student' && isOpen && (
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-gray-400">Nível {user.level}</span>
@@ -161,7 +199,14 @@ export function Sidebar({ user }: SidebarProps) {
             )}
           </div>
         )}
-        <div className="flex items-center gap-2">
+
+        <div
+          className={cn(
+            'flex items-center gap-2',
+            !isOpen && 'md:justify-center'
+          )}
+          title={!isOpen ? `${user.name} — ${user.email}` : undefined}
+        >
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-gray-900 flex-shrink-0"
             style={{ backgroundColor: '#C9A227' }}
@@ -173,7 +218,7 @@ export function Sidebar({ user }: SidebarProps) {
               .join('')
               .toUpperCase()}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className={cn('flex-1 min-w-0', !isOpen && 'md:hidden')}>
             <div className="text-xs font-medium text-white truncate">{user.name}</div>
             <div className="text-xs text-gray-500 truncate">{user.email}</div>
           </div>
