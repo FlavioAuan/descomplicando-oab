@@ -60,7 +60,7 @@ export function StatisticsView({ stats, hotTopics }: StatisticsViewProps) {
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                      <span>Presente em {stat.presenceInExams}/{stat.totalExams} exames</span>
+                      <span>Presente em {stat.presenceInExams} exames ({(stat.presencePercentage * 100).toFixed(0)}%)</span>
                       <span>~{stat.avgPerExam.toFixed(1)} por exame</span>
                     </div>
                   </div>
