@@ -4,10 +4,15 @@ import { getDashboardStats } from '@/server/services/statistics'
 import { db, users, trainings } from '@/lib/db'
 import { sql, eq } from 'drizzle-orm'
 import { StatCard } from '@/components/dashboard/stat-card'
-import { SubjectChart } from '@/components/admin/subject-chart'
+import dynamic from 'next/dynamic'
 import { TrendingTopics } from '@/components/admin/trending-topics'
 import { RecentActivity } from '@/components/admin/recent-activity'
 import { FileText, Users, GraduationCap, CheckSquare } from 'lucide-react'
+
+const SubjectChart = dynamic(
+  () => import('@/components/admin/subject-chart').then(m => ({ default: m.SubjectChart })),
+  { ssr: false }
+)
 
 export const metadata: Metadata = { title: 'Dashboard Admin' }
 
