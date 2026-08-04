@@ -155,52 +155,55 @@ export async function generateTrainingPlan(params: {
   summary: string
   studyStrategy: string
 }> {
-  const prompt = `Crie um plano de treinamento completo para a OAB com as seguintes configurações:
+  // Limit to 14 days per AI call to stay within free-model token limits.
+  // For longer plans the admin can regenerate or extend manually.
+  const daysToGenerate = Math.min(params.daysCount, 14)
+  const topicsPerDay = Math.max(2, Math.min(4, Math.floor(params.hoursPerDay * 60 / 45)))
+
+  const prompt = `Crie um plano de treinamento OAB para os primeiros ${daysToGenerate} dias (de ${params.daysCount} no total).
 
 Nome: ${params.name}
-Descrição: ${params.description}
-Horas por dia: ${params.hoursPerDay}
-Quantidade de dias: ${params.daysCount}
-Data de início: ${params.startDate}
+Horas por dia: ${params.hoursPerDay}h
+Tópicos por dia: ${topicsPerDay}
 
-Disciplinas prioritárias (por peso histórico):
-${params.topSubjects.map(s => `- ${s.name}: ${(s.weight * 100).toFixed(1)}%`).join('\n')}
+Disciplinas prioritárias (top 8 por peso histórico):
+${params.topSubjects.slice(0, 8).map(s => `- ${s.name}: ${(s.weight * 100).toFixed(1)}%`).join('\n')}
 
-Temas com maior probabilidade para a próxima OAB:
-${params.predictions.slice(0, 20).map(p => `- ${p.topic}: ${(p.probability * 100).toFixed(0)}%`).join('\n')}
+Temas mais prováveis para a próxima OAB (top 10):
+${params.predictions.slice(0, 10).map(p => `- ${p.topic}: ${(p.probability * 100).toFixed(0)}%`).join('\n')}
 
-Distribua o conteúdo de forma inteligente considerando:
-1. Peso histórico das disciplinas
-2. Probabilidade de cair na próxima prova
-3. Progressão pedagógica (fácil → difícil)
-4. Revisões espaçadas
-5. Simulados estratégicos
-6. Equilíbrio carga horária por dia
+Regras:
+1. Distribua disciplinas conforme o peso histórico
+2. Progressão fácil → difícil ao longo dos dias
+3. Inclua revisão e simulado a cada 7 dias
+4. Tipos disponíveis: apostila, flashcard, exercise, simulation, review
 
-Tipos de tópico disponíveis: apostila, flashcard, exercise, simulation, video, review
-
-Responda com JSON:
+Responda SOMENTE com JSON válido (sem markdown):
 {
-  "days": [{
-    "dayNumber": 1,
-    "title": "Título do dia",
-    "description": "O que será estudado",
-    "estimatedHours": 4,
-    "topics": [{
-      "order": 1,
-      "title": "Título do tópico",
-      "type": "apostila|flashcard|exercise|simulation|video|review",
-      "subject": "Disciplina",
-      "subtheme": "Subtema",
-      "microtheme": "Microtema",
-      "estimatedMinutes": 30
-    }]
-  }],
-  "summary": "Resumo da estratégia do plano",
-  "studyStrategy": "Explicação detalhada da abordagem pedagógica"
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "título curto",
+      "description": "descrição breve",
+      "estimatedHours": ${params.hoursPerDay},
+      "topics": [
+        {
+          "order": 1,
+          "title": "título do tópico",
+          "type": "apostila",
+          "subject": "Disciplina",
+          "subtheme": "Subtema",
+          "microtheme": "Microtema",
+          "estimatedMinutes": 60
+        }
+      ]
+    }
+  ],
+  "summary": "resumo da estratégia em 2-3 frases",
+  "studyStrategy": "explicação da abordagem pedagógica"
 }`
 
-  return callClaudeJSON(prompt, SYSTEM_TRAINING, { maxTokens: 16384 })
+  return callClaudeJSON(prompt, SYSTEM_TRAINING, { maxTokens: 8192 })
 }
 
 export async function generatePredictions(params: {

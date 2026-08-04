@@ -95,7 +95,7 @@ export async function generateTrainingWithAI(trainingId: string) {
       type: 'training_plan',
       entityId: trainingId,
       entityType: 'training',
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+      model: process.env.OPENROUTER_MODEL || 'openrouter/auto',
       durationMs: Date.now() - startTime,
       success: true,
       createdBy: user.id,
@@ -104,18 +104,20 @@ export async function generateTrainingWithAI(trainingId: string) {
     revalidatePath(`/admin/trainings/${trainingId}`)
     return { data: { summary: plan.summary, strategy: plan.studyStrategy } }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
     await db.insert(aiGenerations).values({
       type: 'training_plan',
       entityId: trainingId,
       entityType: 'training',
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+      model: process.env.OPENROUTER_MODEL || 'openrouter/auto',
       durationMs: Date.now() - startTime,
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
       createdBy: user.id,
     })
 
-    return { error: 'Falha ao gerar plano de treinamento' }
+    return { error: `Falha ao gerar plano de treinamento: ${errorMessage}` }
   }
 }
 
