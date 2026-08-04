@@ -8,7 +8,7 @@ import { getTopicFrequency, calculateSubjectStatistics } from '../services/stati
 import { db, subjects, subsubjects, microtopics, apostilas, flashcards, aiGenerations } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import type { TrainingStatus } from '@/types'
+import type { Training, TrainingStatus } from '@/types'
 
 const createTrainingSchema = z.object({
   name: z.string().min(1),
@@ -173,26 +173,29 @@ export async function generateTopicApostila(topicId: string) {
 export async function updateTrainingStatus(
   trainingId: string,
   status: TrainingStatus
-) {
-  const user = await requireRole('admin', 'super_admin')
+): Promise<{ data: Training } | { error: string }> {
+  try {
+    const user = await requireRole('admin', 'super_admin')
 
-  const training = await trainingsRepository.updateStatus(trainingId, status, user.id)
+    const training = await trainingsRepository.updateStatus(trainingId, status, user.id)
 
-  // Save version on approval
-  if (status === 'approved') {
-    const fullTraining = await trainingsRepository.findWithDays(trainingId)
-    await trainingsRepository.createVersion({
-      trainingId,
-      versionNumber: training.currentVersion,
-      snapshot: fullTraining || {},
-      changesDescription: 'Aprovado para publicação',
-      changedBy: user.id,
-    })
+    if (status === 'approved') {
+      const fullTraining = await trainingsRepository.findWithDays(trainingId)
+      await trainingsRepository.createVersion({
+        trainingId,
+        versionNumber: training.currentVersion,
+        snapshot: fullTraining || {},
+        changesDescription: 'Aprovado para publicação',
+        changedBy: user.id,
+      })
+    }
+
+    revalidatePath('/admin/trainings')
+    revalidatePath(`/admin/trainings/${trainingId}`)
+    return { data: training }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Erro ao atualizar status' }
   }
-
-  revalidatePath('/admin/trainings')
-  revalidatePath(`/admin/trainings/${trainingId}`)
-  return { data: training }
 }
 
 export async function getTrainingForStudent(trainingId: string) {
