@@ -10,7 +10,7 @@ export default async function DashboardLayout({
   const user = await requireUser()
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar user={user} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header user={user} />

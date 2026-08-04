@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { usersRepository } from '../repositories/users'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -14,6 +15,13 @@ const loginSchema = z.object({
 const registerSchema = loginSchema.extend({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
 })
+
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function login(formData: FormData) {
   const raw = {
@@ -52,17 +60,19 @@ export async function register(formData: FormData) {
     return { error: validated.error.errors[0].message }
   }
 
-  const supabase = await createClient()
-
-  const { data, error } = await supabase.auth.signUp({
+  // Use admin client to create user with email auto-confirmed (no confirmation email needed)
+  const adminClient = getAdminClient()
+  const { data, error } = await adminClient.auth.admin.createUser({
     email: validated.data.email,
     password: validated.data.password,
-    options: {
-      data: { name: validated.data.name },
-    },
+    email_confirm: true,
+    user_metadata: { name: validated.data.name },
   })
 
   if (error) {
+    if (error.message.includes('already registered') || error.message.includes('already exists')) {
+      return { error: 'Este email já está cadastrado.' }
+    }
     return { error: error.message }
   }
 
@@ -77,6 +87,13 @@ export async function register(formData: FormData) {
       console.error('Failed to create user profile:', dbError)
     }
   }
+
+  // Sign in immediately after registration
+  const supabase = await createClient()
+  await supabase.auth.signInWithPassword({
+    email: validated.data.email,
+    password: validated.data.password,
+  })
 
   revalidatePath('/', 'layout')
   redirect('/dashboard')

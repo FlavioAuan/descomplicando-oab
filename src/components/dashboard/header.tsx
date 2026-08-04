@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Bell, LogOut, User as UserIcon, Settings } from 'lucide-react'
+import { Bell, LogOut, User as UserIcon, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
@@ -34,49 +34,59 @@ export function Header({ user }: HeaderProps) {
     .toUpperCase()
 
   return (
-    <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6">
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
       <div />
 
-      <div className="flex items-center gap-3">
-        {/* Notifications placeholder */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="relative w-8 h-8 text-gray-500 hover:text-gray-800">
+          <Bell className="w-4 h-4" />
         </Button>
 
-        {/* User Menu */}
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 h-auto p-1">
-              <Avatar className="w-8 h-8">
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 h-auto py-1.5 px-2 hover:bg-gray-50 rounded-lg"
+            >
+              <Avatar className="w-7 h-7">
                 <AvatarImage src={user.avatarUrl || undefined} />
-                <AvatarFallback className="bg-blue-600 text-white text-xs">
+                <AvatarFallback
+                  className="text-xs font-bold text-gray-900"
+                  style={{ backgroundColor: '#C9A22740', color: '#8a6a10' }}
+                >
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="text-left hidden md:block">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {user.name}
+                <div className="text-sm font-semibold text-gray-800 leading-tight">
+                  {user.name.split(' ')[0]}
                 </div>
-                <div className="text-xs text-gray-500">{ROLE_LABELS[user.role]}</div>
+                <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[user.role]}</div>
               </div>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400 hidden md:block" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="font-normal">
+              <div className="font-semibold text-gray-900 text-sm">{user.name}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/student/profile" className="flex items-center gap-2">
+              <Link href="/student/profile" className="flex items-center gap-2 cursor-pointer">
                 <UserIcon className="w-4 h-4" />
-                Perfil
+                Meu perfil
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-red-600 focus:text-red-600"
+              className="text-red-600 focus:text-red-600 cursor-pointer"
               onClick={() => logout()}
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Sair
+              Sair da conta
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

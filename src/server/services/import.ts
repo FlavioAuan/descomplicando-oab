@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { exams, examQuestions, importHistory } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { createServiceClient } from '@/lib/supabase/server'
+import Anthropic from '@anthropic-ai/sdk'
 
 export interface ImportedExam {
   examNumber: number
@@ -17,10 +18,19 @@ export interface ImportedExam {
   }>
 }
 
+export interface ParsedQuestion {
+  number: number
+  statement: string
+  alternatives: { a: string; b: string; c: string; d: string }
+}
+
 export async function importExamToDatabase(
   examData: ImportedExam,
   importId: string
 ): Promise<{ examId: string; questionCount: number }> {
+  // importId is used for tracking but not stored per-question in this schema
+  void importId
+
   // Check if exam already exists
   const existing = await db
     .select({ id: exams.id })
@@ -67,14 +77,14 @@ export async function importExamToDatabase(
 
 export async function createImportRecord(params: {
   source: string
-  importedBy: string
+  importedBy?: string | null
 }): Promise<string> {
   const [record] = await db
     .insert(importHistory)
     .values({
       source: params.source,
       status: 'running',
-      importedBy: params.importedBy,
+      // importedBy is a UUID ref to users — null for system/background imports
       startedAt: new Date(),
     })
     .returning({ id: importHistory.id })
@@ -133,68 +143,228 @@ export async function getImportHistory() {
   return db.select().from(importHistory).orderBy(importHistory.startedAt)
 }
 
-// Parse OAB exam text extracted from PDF
-export function parseExamText(text: string): Array<{
-  number: number
-  statement: string
-  alternatives: { a: string; b: string; c: string; d: string }
-}> {
-  const questions: Array<{
-    number: number
-    statement: string
-    alternatives: { a: string; b: string; c: string; d: string }
-  }> = []
+// ─── PDF Text Parsers ─────────────────────────────────────────────────────────
 
-  // Pattern to match question blocks
-  const questionPattern = /(?:QUESTÃO|Questão)\s+(\d+)([\s\S]*?)(?=(?:QUESTÃO|Questão)\s+\d+|$)/gi
-  const altPattern = /^\s*([A-D])\)\s*([\s\S]*?)(?=^\s*[A-D]\)|$)/gm
+/**
+ * Parse OAB exam text extracted from PDF.
+ * Handles multiple common FGV formatting patterns.
+ */
+export function parseExamText(text: string): ParsedQuestion[] {
+  const questions: ParsedQuestion[] = []
 
-  let match
-  while ((match = questionPattern.exec(text)) !== null) {
-    const number = parseInt(match[1])
+  // Normalise line endings
+  const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+  // ── Strategy 1: "QUESTÃO N" or "QUESTÃO 0N" heading ────────────────────────
+  // Matches: QUESTÃO 1, QUESTÃO 01, Questão 1, etc.
+  const qPattern = /(?:QUESTÃO|Questão|QUESTAO|Questao)\s+(\d{1,3})([\s\S]*?)(?=(?:QUESTÃO|Questão|QUESTAO|Questao)\s+\d{1,3}|$)/gi
+  let match: RegExpExecArray | null
+
+  while ((match = qPattern.exec(normalised)) !== null) {
+    const number = parseInt(match[1], 10)
     const block = match[2].trim()
-
-    const alternatives: Record<string, string> = {}
-    let altMatch
-    altPattern.lastIndex = 0
-
-    while ((altMatch = altPattern.exec(block)) !== null) {
-      alternatives[altMatch[1].toLowerCase()] = altMatch[2].trim()
-    }
-
-    const statementEnd = block.search(/^\s*A\)/m)
-    const statement = statementEnd > 0
-      ? block.substring(0, statementEnd).trim()
-      : block
-
-    if (statement && alternatives.a) {
-      questions.push({
-        number,
-        statement,
-        alternatives: {
-          a: alternatives.a || '',
-          b: alternatives.b || '',
-          c: alternatives.c || '',
-          d: alternatives.d || '',
-        },
-      })
+    const parsed = extractStatementAndAlternatives(block)
+    if (parsed) {
+      questions.push({ number, ...parsed })
     }
   }
+
+  if (questions.length >= 5) return questions
+
+  // ── Strategy 2: "N -" or "N." heading (FGV older format) ───────────────────
+  // Matches lines like: "1 -", "01 -", "1.", "01."
+  const qPattern2 = /^(\d{1,3})\s*[-\.]\s*\n([\s\S]*?)(?=^\d{1,3}\s*[-\.]|$)/gm
+  const questions2: ParsedQuestion[] = []
+
+  while ((match = qPattern2.exec(normalised)) !== null) {
+    const number = parseInt(match[1], 10)
+    const block = match[2].trim()
+    const parsed = extractStatementAndAlternatives(block)
+    if (parsed) {
+      questions2.push({ number, ...parsed })
+    }
+  }
+
+  if (questions2.length >= 5) return questions2
+
+  // ── Strategy 3: Detect "A)" / "(A)" alternatives inline ────────────────────
+  const qPattern3 = /^(\d{1,3})\s*[-\.)]\s*([\s\S]*?)(?=^\d{1,3}\s*[-\.]|$)/gm
+  const questions3: ParsedQuestion[] = []
+
+  while ((match = qPattern3.exec(normalised)) !== null) {
+    const number = parseInt(match[1], 10)
+    if (number > 100) continue // sanity check
+    const block = match[2].trim()
+    const parsed = extractStatementAndAlternatives(block)
+    if (parsed) {
+      questions3.push({ number, ...parsed })
+    }
+  }
+
+  if (questions3.length >= 5) return questions3
 
   return questions
 }
 
-// Parse gabarito text
+/**
+ * Extract statement and alternatives from a question block.
+ * Supports both "A)" and "(A)" style alternatives.
+ */
+function extractStatementAndAlternatives(
+  block: string
+): Omit<ParsedQuestion, 'number'> | null {
+  // Try "(A)" style first
+  const parenAlt = /^\s*\(([A-D])\)\s*([\s\S]*?)(?=^\s*\([A-D]\)|$)/gm
+  // Try "A)" style
+  const plainAlt = /^\s*([A-D])\)\s*([\s\S]*?)(?=^\s*[A-D]\)|$)/gm
+
+  let altMatch: RegExpExecArray | null
+  const alternatives: Record<string, string> = {}
+
+  // Try paren style
+  while ((altMatch = parenAlt.exec(block)) !== null) {
+    alternatives[altMatch[1].toLowerCase()] = altMatch[2].trim()
+  }
+
+  // If paren style found nothing, try plain style
+  if (Object.keys(alternatives).length === 0) {
+    while ((altMatch = plainAlt.exec(block)) !== null) {
+      alternatives[altMatch[1].toLowerCase()] = altMatch[2].trim()
+    }
+  }
+
+  if (!alternatives.a) return null
+
+  // Statement = everything before the first alternative
+  let statementEnd = block.search(/^\s*\([A-D]\)/m)
+  if (statementEnd < 0) statementEnd = block.search(/^\s*[A-D]\)/m)
+  const statement = statementEnd > 0
+    ? block.substring(0, statementEnd).trim()
+    : block.split('\n')[0].trim()
+
+  if (!statement) return null
+
+  return {
+    statement,
+    alternatives: {
+      a: alternatives.a || '',
+      b: alternatives.b || '',
+      c: alternatives.c || '',
+      d: alternatives.d || '',
+    },
+  }
+}
+
+/**
+ * Parse gabarito (answer key) text.
+ * Handles patterns like: "1. A", "1-A", "01 A", "1)A", "QUESTÃO 1: A"
+ */
 export function parseGabarito(text: string): Record<number, string> {
+  return parseGabaritoText(text)
+}
+
+export function parseGabaritoText(text: string): Record<number, string> {
   const answers: Record<number, string> = {}
+  const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
-  // Common patterns: "1. A" or "1-A" or "01 A"
-  const pattern = /(\d+)[\.\-\s]+([A-D])/g
-  let match
+  // Multiple patterns for different gabarito formats
+  const patterns = [
+    // "QUESTÃO 01: A" or "Questão 1 - A"
+    /(?:QUESTÃO|Questão|QUESTAO)\s+(\d{1,3})\s*[:\-]\s*([A-D])/gi,
+    // "01. A" or "1. A" or "01 - A" or "01-A"
+    /^\s*(\d{1,3})\s*[\.\-\)]\s*([A-D])\b/gm,
+    // "01 A" (space-separated, whole line)
+    /^\s*(\d{1,3})\s+([A-D])\s*$/gm,
+    // "1:A" or "1: A"
+    /(\d{1,3})\s*:\s*([A-D])\b/g,
+  ]
 
-  while ((match = pattern.exec(text)) !== null) {
-    answers[parseInt(match[1])] = match[2].toLowerCase()
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null
+    pattern.lastIndex = 0
+    while ((match = pattern.exec(normalised)) !== null) {
+      const num = parseInt(match[1], 10)
+      if (num > 0 && num <= 200 && !answers[num]) {
+        answers[num] = match[2].toLowerCase()
+      }
+    }
   }
 
   return answers
+}
+
+// ─── Claude Fallback Parser ───────────────────────────────────────────────────
+
+/**
+ * Use Claude to extract questions from PDF text when regex fails.
+ * Returns an empty array if ANTHROPIC_API_KEY is not set.
+ */
+export async function parseExamWithClaude(
+  text: string,
+  examInfo: string
+): Promise<ParsedQuestion[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return []
+
+  const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'
+  const client = new Anthropic({ apiKey })
+
+  // Truncate text to avoid token limits — send first 60k chars
+  const truncated = text.length > 60000 ? text.substring(0, 60000) + '\n[TEXTO TRUNCADO]' : text
+
+  const systemPrompt = `Você é um extrator de questões de provas da OAB (Exame da Ordem dos Advogados do Brasil).
+Sua tarefa é analisar o texto bruto extraído de um PDF de prova e retornar TODAS as questões encontradas em formato JSON válido.
+Retorne APENAS um array JSON, sem markdown, sem explicações adicionais.`
+
+  const userPrompt = `Extraia todas as questões do seguinte texto de prova OAB (${examInfo}).
+Cada questão deve ter: number (inteiro), statement (enunciado completo), alternatives (objeto com a, b, c, d como strings).
+
+Formato de resposta (array JSON):
+[
+  {
+    "number": 1,
+    "statement": "enunciado da questão...",
+    "alternatives": {
+      "a": "texto da alternativa A",
+      "b": "texto da alternativa B",
+      "c": "texto da alternativa C",
+      "d": "texto da alternativa D"
+    }
+  }
+]
+
+TEXTO DA PROVA:
+${truncated}`
+
+  try {
+    const message = await client.messages.create({
+      model,
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    })
+
+    const content = message.content[0]
+    if (content.type !== 'text') return []
+
+    const raw = content.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(raw) as Array<{
+      number: number
+      statement: string
+      alternatives: { a: string; b: string; c: string; d: string }
+    }>
+
+    return parsed.map((q) => ({
+      number: q.number,
+      statement: q.statement || '',
+      alternatives: {
+        a: q.alternatives?.a || '',
+        b: q.alternatives?.b || '',
+        c: q.alternatives?.c || '',
+        d: q.alternatives?.d || '',
+      },
+    }))
+  } catch {
+    return []
+  }
 }
