@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { examQuestions, subjects, subsubjects, exams, statistics } from '@/lib/db/schema'
-import { eq, sql, desc, and } from 'drizzle-orm'
+import { eq, sql, desc, and, inArray } from 'drizzle-orm'
 
 export interface SubjectStat {
   subjectId: string
@@ -48,14 +48,16 @@ export async function calculateSubjectStatistics(): Promise<SubjectStat[]> {
 
   const recentExamIds = recentExams.map(e => e.id)
 
-  const recentCounts = await db
-    .select({
-      subjectId: examQuestions.subjectId,
-      recentCount: sql<number>`count(*)::int`,
-    })
-    .from(examQuestions)
-    .where(sql`${examQuestions.examId} = ANY(${recentExamIds})`)
-    .groupBy(examQuestions.subjectId)
+  const recentCounts = recentExamIds.length > 0
+    ? await db
+        .select({
+          subjectId: examQuestions.subjectId,
+          recentCount: sql<number>`count(*)::int`,
+        })
+        .from(examQuestions)
+        .where(inArray(examQuestions.examId, recentExamIds))
+        .groupBy(examQuestions.subjectId)
+    : []
 
   const recentMap = new Map(recentCounts.map(r => [r.subjectId, r.recentCount]))
 
@@ -124,14 +126,16 @@ export async function getTopicFrequency(): Promise<Array<{
     .orderBy(desc(sql`count(${examQuestions.id})`))
     .limit(200)
 
-  const recentData = await db
-    .select({
-      subsubjectId: examQuestions.subsubjectId,
-      recentCount: sql<number>`count(*)::int`,
-    })
-    .from(examQuestions)
-    .where(sql`${examQuestions.examId} = ANY(${recentExamIds})`)
-    .groupBy(examQuestions.subsubjectId)
+  const recentData = recentExamIds.length > 0
+    ? await db
+        .select({
+          subsubjectId: examQuestions.subsubjectId,
+          recentCount: sql<number>`count(*)::int`,
+        })
+        .from(examQuestions)
+        .where(inArray(examQuestions.examId, recentExamIds))
+        .groupBy(examQuestions.subsubjectId)
+    : []
 
   const recentMap = new Map(recentData.map(r => [r.subsubjectId, r.recentCount]))
 
