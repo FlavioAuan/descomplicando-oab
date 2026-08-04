@@ -8,8 +8,9 @@ let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
 
 function getDb() {
   if (!_db) {
-    const connectionString = process.env.DATABASE_URL
-    if (!connectionString) throw new Error('DATABASE_URL env var is not set')
+    const raw = process.env.DATABASE_URL
+    if (!raw) throw new Error('DATABASE_URL env var is not set')
+    const connectionString = raw.replace(/^﻿/, '').trim()
     _client = postgres(connectionString, { prepare: false })
     _db = drizzle(_client, { schema })
   }
