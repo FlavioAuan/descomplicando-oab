@@ -77,7 +77,17 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel — form */}
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 px-6 py-12">
+      <div className="relative flex-1 flex flex-col items-center justify-center bg-gray-50 px-6 py-12">
+        {/* Back link */}
+        <div className="absolute top-5 right-6 lg:top-5 lg:right-6">
+          <Link
+            href="/"
+            className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1 transition-colors"
+          >
+            ← Página inicial
+          </Link>
+        </div>
+
         {/* Mobile logo */}
         <div className="flex items-center gap-3 mb-10 lg:hidden">
           <div
