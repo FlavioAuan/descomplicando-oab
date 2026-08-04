@@ -34,7 +34,7 @@ export default function LoginPage() {
           <div>
             <div className="text-white font-bold text-lg leading-tight">DescomplicandOAB</div>
             <div className="text-xs leading-tight" style={{ color: '#C9A227' }}>
-              Preparação Inteligente para Advogados
+              Treinamento para o Exame da Ordem
             </div>
           </div>
         </div>
@@ -49,14 +49,14 @@ export default function LoginPage() {
             Sua aprovação na OAB começa aqui.
           </h2>
           <p className="text-gray-400 text-base leading-relaxed mb-10">
-            Método inteligente com IA, provas históricas classificadas e previsões de temas para a próxima fase.
+            Treinamento estruturado com todas as provas históricas, simulados por disciplina e análise de incidência de temas.
           </p>
 
           <div className="space-y-4">
             {[
-              { icon: BookOpen, text: 'Banco com todas as provas históricas da OAB' },
-              { icon: Brain, text: 'Tutor IA disponível 24h para tirar dúvidas' },
-              { icon: Trophy, text: 'Simulados adaptativos com estatísticas em tempo real' },
+              { icon: BookOpen, text: 'Todas as 46 provas da OAB catalogadas e organizadas' },
+              { icon: Brain, text: 'Flashcards e revisão espaçada para fixar o conteúdo' },
+              { icon: Trophy, text: 'Simulados com estatísticas de desempenho por disciplina' },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-3">
                 <div

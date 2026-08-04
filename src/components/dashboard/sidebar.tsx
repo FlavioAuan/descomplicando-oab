@@ -88,7 +88,7 @@ export function Sidebar({ user }: SidebarProps) {
           <div>
             <div className="text-white font-bold text-sm leading-tight">DescomplicandOAB</div>
             <div className="text-xs leading-tight" style={{ color: '#C9A227' }}>
-              Preparação Inteligente
+              Treinamento para a OAB
             </div>
           </div>
         </Link>

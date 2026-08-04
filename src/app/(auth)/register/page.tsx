@@ -32,7 +32,7 @@ export default function RegisterPage() {
           <div>
             <div className="text-white font-bold text-lg leading-tight">DescomplicandOAB</div>
             <div className="text-xs leading-tight" style={{ color: '#C9A227' }}>
-              Preparação Inteligente para Advogados
+              Treinamento para o Exame da Ordem
             </div>
           </div>
         </div>
@@ -43,14 +43,14 @@ export default function RegisterPage() {
             Comece a sua jornada rumo à aprovação.
           </h2>
           <p className="text-gray-400 text-base leading-relaxed mb-10">
-            Junte-se a milhares de candidatos que usam inteligência artificial para estudar de forma mais eficiente.
+            Acesse todas as provas históricas da OAB, treine com simulados e acompanhe sua evolução por disciplina.
           </p>
 
           <div className="space-y-4">
             {[
               { icon: ShieldCheck, text: 'Criação de conta gratuita, sem cartão de crédito' },
-              { icon: Clock, text: 'Acesso imediato a questões históricas da OAB' },
-              { icon: Target, text: 'Plano de estudo personalizado pela IA' },
+              { icon: Clock, text: 'Acesso imediato a todas as provas históricas da OAB' },
+              { icon: Target, text: 'Estatísticas de incidência para priorizar seus estudos' },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-3">
                 <div

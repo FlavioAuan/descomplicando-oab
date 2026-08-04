@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     default: 'DescomplicandOAB',
     template: '%s | DescomplicandOAB',
   },
-  description: 'Plataforma inteligente para preparação da OAB com IA',
-  keywords: ['OAB', 'preparação', 'concurso', 'direito', 'advogado'],
+  description: 'Treinamento completo para a OAB 1ª Fase com todas as provas históricas, simulados e estatísticas de incidência.',
+  keywords: ['OAB', 'treinamento', 'preparação', 'exame da ordem', 'concurso', 'direito', 'advogado', 'questões OAB'],
 }
 
 export default function RootLayout({
