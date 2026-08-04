@@ -28,7 +28,7 @@ export function RecentSimulations({ simulations }: RecentSimulationsProps) {
               >
                 <div>
                   <p className="text-sm font-medium text-gray-700">
-                    {sim.totalAnswered} questões respondidas
+                    {sim.totalAnswered ?? 0} questões respondidas
                   </p>
                   <p className="text-xs text-gray-400">
                     {formatDate(sim.startedAt)}
@@ -37,15 +37,15 @@ export function RecentSimulations({ simulations }: RecentSimulationsProps) {
                 <div className="text-right">
                   <Badge
                     className={cn(
-                      sim.percentage >= 0.6
+                      (sim.percentage ?? 0) >= 0.6
                         ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
                     )}
                   >
-                    {formatPercent(sim.percentage)}
+                    {formatPercent(sim.percentage ?? 0)}
                   </Badge>
                   <p className="text-xs text-gray-400 mt-1">
-                    {sim.totalCorrect}/{sim.totalAnswered}
+                    {sim.totalCorrect ?? 0}/{sim.totalAnswered ?? 0}
                   </p>
                 </div>
               </div>

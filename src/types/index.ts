@@ -149,11 +149,11 @@ export interface StudentSimulation {
   simulationId: string
   startedAt: Date
   completedAt?: Date | null
-  totalAnswered: number
-  totalCorrect: number
-  score: number
-  percentage: number
-  timeSpentSeconds: number
+  totalAnswered: number | null
+  totalCorrect: number | null
+  score: number | null
+  percentage: number | null
+  timeSpentSeconds: number | null
 }
 
 export interface ErrorNotebookEntry {
