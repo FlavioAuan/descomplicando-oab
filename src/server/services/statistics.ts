@@ -203,7 +203,7 @@ export async function getDashboardStats() {
     totalQuestions,
     classifiedQuestions: classified,
     classificationRate: totalQuestions > 0 ? classified / totalQuestions : 0,
-    topSubjects: subjectStats.slice(0, 10).map(s => ({
+    topSubjects: subjectStats.map(s => ({
       name: s.subjectName,
       count: s.totalQuestions,
       percentage: s.percentageHistorical,

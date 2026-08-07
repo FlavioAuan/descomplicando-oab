@@ -19,7 +19,7 @@ export function TrendingTopics({ subjects }: TrendingTopicsProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {subjects.slice(0, 10).map((subject, index) => (
+          {subjects.map((subject, index) => (
             <div key={subject.name} className="flex items-center gap-3">
               <span className="w-6 text-center text-sm font-bold text-gray-400">
                 {index + 1}

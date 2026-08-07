@@ -1,8 +1,18 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { BookOpen, ClipboardList, BarChart3, Award, Target, Shield, Scale } from 'lucide-react'
+import { db, subjects } from '@/lib/db'
+import { asc } from 'drizzle-orm'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const dbSubjects = await db
+    .select({ name: subjects.name })
+    .from(subjects)
+    .orderBy(asc(subjects.name))
+
+  const disciplineNames = dbSubjects.map((s) => s.name)
+  const totalDisciplines = disciplineNames.length
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-oab-dark via-oab-navy to-blue-900 text-white">
       {/* Header */}
@@ -61,7 +71,7 @@ export default function LandingPage() {
           {[
             { value: '46', label: 'Exames históricos' },
             { value: '3.680+', label: 'Questões catalogadas' },
-            { value: '19', label: 'Disciplinas cobertas' },
+            { value: String(totalDisciplines), label: 'Disciplinas cobertas' },
             { value: '100%', label: 'Conteúdo oficial OAB' },
           ].map((stat) => (
             <div key={stat.label} className="text-center bg-white/5 border border-white/10 rounded-xl p-6">
@@ -101,10 +111,10 @@ export default function LandingPage() {
       {/* Disciplines */}
       <section className="container mx-auto px-4 py-16">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-10">
-          <h2 className="text-2xl font-bold text-center mb-2">19 Disciplinas cobertas</h2>
+          <h2 className="text-2xl font-bold text-center mb-2">{totalDisciplines} Disciplinas cobertas</h2>
           <p className="text-blue-200 text-center text-sm mb-8">Todo o conteúdo cobrado no Exame da Ordem</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {disciplines.map(d => (
+            {disciplineNames.map(d => (
               <span
                 key={d}
                 className="px-3 py-1.5 bg-white/8 border border-white/10 rounded-full text-sm text-blue-100"
@@ -172,10 +182,3 @@ const features = [
   },
 ]
 
-const disciplines = [
-  'Ética Profissional', 'Direito Constitucional', 'Direito Civil', 'Direito Processual Civil',
-  'Direito Penal', 'Direito Processual Penal', 'Direito do Trabalho', 'Direito Processual do Trabalho',
-  'Direito Administrativo', 'Direito Tributário', 'Direito Empresarial', 'Direito Ambiental',
-  'Direito do Consumidor', 'Direitos Humanos', 'Direito Internacional', 'Direito Previdenciário',
-  'Direito Financeiro', 'Filosofia do Direito', 'ECA',
-]
