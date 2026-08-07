@@ -57,14 +57,14 @@ export class QuestionsRepository extends BaseRepository {
     count: number
     excludeIds?: string[]
   }): Promise<ExamQuestion[]> {
-    const conditions = []
+    const conditions = [sql`length(${examQuestions.alternatives}->>'a') > 5`]
     if (params.subjectId) conditions.push(eq(examQuestions.subjectId, params.subjectId))
     if (params.subsubjectId) conditions.push(eq(examQuestions.subsubjectId, params.subsubjectId))
 
     return this.db
       .select()
       .from(examQuestions)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(sql`RANDOM()`)
       .limit(params.count) as Promise<ExamQuestion[]>
   }

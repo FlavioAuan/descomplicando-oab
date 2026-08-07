@@ -103,6 +103,7 @@ export const exams = pgTable('exams', {
   pdfUrl: text('pdf_url'),
   gabaritoUrl: text('gabarito_url'),
   importedAt: timestamp('imported_at'),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [uniqueIndex('exams_number_year_idx').on(t.examNumber, t.year)])
 

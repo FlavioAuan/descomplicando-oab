@@ -5,6 +5,7 @@ import {
   simulations,
   simulationQuestions,
   examQuestions,
+  exams,
   statistics,
 } from '@/lib/db'
 import { eq, and, isNull, sql } from 'drizzle-orm'
@@ -87,7 +88,8 @@ export async function POST(req: NextRequest) {
       const qs = await db
         .select({ id: examQuestions.id })
         .from(examQuestions)
-        .where(eq(examQuestions.subjectId, subjectId))
+        .innerJoin(exams, and(eq(examQuestions.examId, exams.id), eq(exams.isActive, true)))
+        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'a') > 5`))
         .orderBy(sql`RANDOM()`)
         .limit(count)
       selectedIds.push(...qs.map((q) => q.id))
@@ -98,7 +100,8 @@ export async function POST(req: NextRequest) {
       const qs = await db
         .select({ id: examQuestions.id })
         .from(examQuestions)
-        .where(eq(examQuestions.subjectId, subjectId))
+        .innerJoin(exams, and(eq(examQuestions.examId, exams.id), eq(exams.isActive, true)))
+        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'a') > 5`))
         .orderBy(sql`RANDOM()`)
         .limit(count)
       selectedIds.push(...qs.map((q) => q.id))
