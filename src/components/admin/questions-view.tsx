@@ -21,8 +21,10 @@ import {
   HelpCircle,
   X,
   Filter,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { QuestionEditDialog } from '@/components/admin/question-edit-dialog'
 
 type Question = {
   id: string
@@ -82,100 +84,124 @@ function AnswerBadge({ answer }: { answer: string }) {
   )
 }
 
-function QuestionRow({ q }: { q: Question }) {
+function QuestionRow({ q: initial }: { q: Question }) {
   const [expanded, setExpanded] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [q, setQ] = useState(initial)
+
   const preview = q.statement.length > 120 ? q.statement.slice(0, 120) + '…' : q.statement
 
   return (
-    <div className="border rounded-lg bg-white overflow-hidden">
-      <div
-        className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        {/* Prova + Questão */}
-        <div className="flex-shrink-0 text-center min-w-[56px]">
-          <div className="text-xs font-bold text-gray-700">{q.examNumber}º Exame</div>
-          <div className="text-xs text-gray-400">{q.examYear}</div>
-          <div
-            className="mt-1 text-xs font-semibold rounded px-1.5 py-0.5"
-            style={{ backgroundColor: '#C9A22720', color: '#8a6a10' }}
-          >
-            Q{q.number}
+    <>
+      <div className="border rounded-lg bg-white overflow-hidden">
+        <div
+          className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {/* Prova + Questão */}
+          <div className="flex-shrink-0 text-center min-w-[56px]">
+            <div className="text-xs font-bold text-gray-700">{q.examNumber}º Exame</div>
+            <div className="text-xs text-gray-400">{q.examYear}</div>
+            <div
+              className="mt-1 text-xs font-semibold rounded px-1.5 py-0.5"
+              style={{ backgroundColor: '#C9A22720', color: '#8a6a10' }}
+            >
+              Q{q.number}
+            </div>
           </div>
-        </div>
 
-        {/* Divider */}
-        <div className="w-px bg-gray-200 self-stretch flex-shrink-0" />
+          {/* Divider */}
+          <div className="w-px bg-gray-200 self-stretch flex-shrink-0" />
 
-        {/* Content */}
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <p className="text-sm text-gray-700 leading-relaxed">
-            {expanded ? q.statement : preview}
-          </p>
+          {/* Content */}
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {expanded ? q.statement : preview}
+            </p>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {q.subjectName ? (
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{
-                  backgroundColor: (q.subjectColor ?? '#2563EB') + '20',
-                  color: q.subjectColor ?? '#2563EB',
-                }}
-              >
-                {q.subjectName}
-              </span>
-            ) : (
-              <span className="text-xs text-gray-400 italic">Não classificada</span>
-            )}
-            {q.subsubjectName && (
-              <span className="text-xs text-gray-500">· {q.subsubjectName}</span>
-            )}
-          </div>
-        </div>
-
-        {/* Answer + expand */}
-        <div className="flex-shrink-0 flex flex-col items-center gap-2">
-          <AnswerBadge answer={q.correctAnswer} />
-          {expanded ? (
-            <ChevronUp className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          )}
-        </div>
-      </div>
-
-      {/* Expanded alternatives */}
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
-          {(['a', 'b', 'c', 'd'] as const).map((opt) => {
-            const isCorrect = q.correctAnswer?.toLowerCase() === opt
-            return (
-              <div
-                key={opt}
-                className={cn(
-                  'flex items-start gap-2 p-2 rounded-lg text-sm',
-                  isCorrect
-                    ? 'bg-green-50 border border-green-200'
-                    : 'bg-gray-50 border border-transparent'
-                )}
-              >
+            <div className="flex flex-wrap items-center gap-2">
+              {q.subjectName ? (
                 <span
+                  className="text-xs font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: (q.subjectColor ?? '#2563EB') + '20',
+                    color: q.subjectColor ?? '#2563EB',
+                  }}
+                >
+                  {q.subjectName}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400 italic">Não classificada</span>
+              )}
+              {q.subsubjectName && (
+                <span className="text-xs text-gray-500">· {q.subsubjectName}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Answer + edit + expand */}
+          <div className="flex-shrink-0 flex flex-col items-center gap-2">
+            <AnswerBadge answer={q.correctAnswer} />
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditOpen(true) }}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors px-1.5 py-0.5 rounded hover:bg-blue-50"
+              title="Editar questão"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Editar
+            </button>
+            {expanded ? (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            )}
+          </div>
+        </div>
+
+        {/* Expanded alternatives */}
+        {expanded && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-2">
+            {(['a', 'b', 'c', 'd'] as const).map((opt) => {
+              const isCorrect = q.correctAnswer?.toLowerCase() === opt
+              return (
+                <div
+                  key={opt}
                   className={cn(
-                    'font-bold uppercase w-5 flex-shrink-0',
-                    isCorrect ? 'text-green-700' : 'text-gray-500'
+                    'flex items-start gap-2 p-2 rounded-lg text-sm',
+                    isCorrect
+                      ? 'bg-green-50 border border-green-200'
+                      : 'bg-gray-50 border border-transparent'
                   )}
                 >
-                  {opt})
-                </span>
-                <span className={isCorrect ? 'text-green-800' : 'text-gray-700'}>
-                  {q.alternatives[opt] || <em className="text-gray-400">—</em>}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+                  <span
+                    className={cn(
+                      'font-bold uppercase w-5 flex-shrink-0',
+                      isCorrect ? 'text-green-700' : 'text-gray-500'
+                    )}
+                  >
+                    {opt})
+                  </span>
+                  <span className={isCorrect ? 'text-green-800' : 'text-gray-700'}>
+                    {q.alternatives[opt] || <em className="text-gray-400">—</em>}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {editOpen && (
+        <QuestionEditDialog
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          question={q}
+          onSaved={(patch) =>
+            setQ((prev) => ({ ...prev, ...patch }))
+          }
+        />
       )}
-    </div>
+    </>
   )
 }
 
