@@ -97,13 +97,22 @@ export async function callClaude(
 
   const data = await res.json()
   const choice = data.choices?.[0]
-  const content = (choice?.message?.content as string) ?? ''
+  const msg = choice?.message
+
+  // Some "thinking" models put output in reasoning_content instead of content
+  const content =
+    (msg?.content as string | null) ||
+    (msg?.reasoning_content as string | null) ||
+    ''
 
   if (!content) {
     console.error('[callClaude] empty content. Full response:', JSON.stringify(data, null, 2))
     const reason = choice?.finish_reason ?? 'unknown'
     const usedModel = data.model ?? model
-    throw new Error(`Modelo ${usedModel} retornou resposta vazia (finish_reason: ${reason})`)
+    throw new Error(
+      `Modelo ${usedModel} retornou resposta vazia (finish_reason: ${reason}). ` +
+      `Acesse Configurações IA e troque para google/gemini-flash-1.5`
+    )
   }
 
   return content
