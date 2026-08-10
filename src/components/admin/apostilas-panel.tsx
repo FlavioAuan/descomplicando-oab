@@ -14,9 +14,9 @@ import {
 import { toast } from 'sonner'
 import {
   Upload, X, FileText, Loader2, BookOpen,
-  Trash2, Eye, Plus, Sparkles,
+  Trash2, Eye, Plus, Sparkles, Pencil,
 } from 'lucide-react'
-import { createApostila, deleteApostila, getApostilaContent } from '@/server/actions/apostilas'
+import { createApostila, deleteApostila, getApostilaContent, updateApostila } from '@/server/actions/apostilas'
 import type { ApostilaListItem } from '@/server/actions/apostilas'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
@@ -55,16 +55,132 @@ function ApostilaViewer({
   )
 }
 
+// ─── Edit dialog ──────────────────────────────────────────────────────────────
+
+function EditApostilaDialog({
+  apostila, open, onClose, onSaved,
+}: {
+  apostila: ApostilaListItem
+  open: boolean
+  onClose: () => void
+  onSaved: (newTitle: string) => void
+}) {
+  const [editTitle, setEditTitle] = useState(apostila.title)
+  const [editHtml, setEditHtml] = useState('')
+  const [tab, setTab] = useState<'edit' | 'preview'>('edit')
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Load content when dialog opens
+  async function handleOpen(isOpen: boolean) {
+    if (!isOpen) { onClose(); return }
+    if (editHtml) return // already loaded
+    setLoading(true)
+    const content = await getApostilaContent(apostila.id)
+    if (content) {
+      setEditTitle(content.title)
+      setEditHtml(content.contentHtml)
+    }
+    setLoading(false)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const res = await updateApostila(apostila.id, { title: editTitle, contentHtml: editHtml })
+    if ('error' in res) {
+      toast.error(res.error)
+    } else {
+      toast.success('Apostila atualizada')
+      onSaved(editTitle)
+      onClose()
+    }
+    setSaving(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col gap-0 p-0">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
+          <DialogTitle className="text-base">Editar Apostila</DialogTitle>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1 overflow-hidden p-6 gap-4">
+            {/* Title */}
+            <div className="space-y-1 flex-shrink-0">
+              <Label htmlFor="editTitle" className="text-sm font-medium">Título</Label>
+              <Input
+                id="editTitle"
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+              />
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit flex-shrink-0">
+              {(['edit', 'preview'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    tab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {t === 'edit' ? 'Editar HTML' : 'Visualizar'}
+                </button>
+              ))}
+            </div>
+
+            {/* Editor / Preview */}
+            <div className="flex-1 overflow-hidden rounded-lg border min-h-0">
+              {tab === 'edit' ? (
+                <textarea
+                  value={editHtml}
+                  onChange={e => setEditHtml(e.target.value)}
+                  className="w-full h-full resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
+                  spellCheck={false}
+                  style={{ minHeight: '400px' }}
+                />
+              ) : (
+                <div
+                  className="w-full h-full overflow-y-auto p-6 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: editHtml }}
+                />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 flex-shrink-0">
+              <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar alterações
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Apostila card ────────────────────────────────────────────────────────────
 
 function ApostilaCard({
-  apostila, onView, onDelete,
+  apostila, onView, onDelete, onTitleChange,
 }: {
   apostila: ApostilaListItem
   onView: () => void
   onDelete: () => void
+  onTitleChange: (newTitle: string) => void
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   async function handleDelete() {
     setDeleting(true)
@@ -75,32 +191,44 @@ function ApostilaCard({
   }
 
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-      <div className="flex items-start gap-3 min-w-0">
-        <BookOpen className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-        <div className="min-w-0">
-          <p className="font-medium text-gray-900 truncate">{apostila.title}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {formatDate(apostila.generatedAt)}
-            {apostila.subjectName && (
-              <> · <span className="text-blue-600">{apostila.subjectName}</span></>
-            )}
-          </p>
+    <>
+      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+        <div className="flex items-start gap-3 min-w-0">
+          <BookOpen className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="font-medium text-gray-900 truncate">{apostila.title}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {formatDate(apostila.generatedAt)}
+              {apostila.subjectName && (
+                <> · <span className="text-blue-600">{apostila.subjectName}</span></>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={onView}>
+            <Eye className="w-4 h-4 mr-1" /> Ver
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="w-4 h-4 mr-1" /> Editar
+          </Button>
+          <Button
+            variant="ghost" size="icon"
+            className="text-red-400 hover:text-red-600 hover:bg-red-50"
+            onClick={handleDelete} disabled={deleting}
+          >
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </Button>
         </div>
       </div>
-      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-        <Button variant="outline" size="sm" onClick={onView}>
-          <Eye className="w-4 h-4 mr-1" /> Ver
-        </Button>
-        <Button
-          variant="ghost" size="icon"
-          className="text-red-400 hover:text-red-600 hover:bg-red-50"
-          onClick={handleDelete} disabled={deleting}
-        >
-          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </Button>
-      </div>
-    </div>
+
+      <EditApostilaDialog
+        apostila={apostila}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={onTitleChange}
+      />
+    </>
   )
 }
 
@@ -294,6 +422,11 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
                 onDelete={() => {
                   setApostilasList(prev => prev.filter(x => x.id !== a.id))
                   router.refresh()
+                }}
+                onTitleChange={newTitle => {
+                  setApostilasList(prev =>
+                    prev.map(x => x.id === a.id ? { ...x, title: newTitle } : x)
+                  )
                 }}
               />
             ))}

@@ -99,6 +99,22 @@ export type ApostilaListItem = {
   subjectName: string | null
 }
 
+export async function updateApostila(
+  id: string,
+  data: { title?: string; contentHtml?: string }
+): Promise<{ success: true } | { error: string }> {
+  await requireRole('admin', 'super_admin')
+  if (!data.title && !data.contentHtml) return { error: 'Nada para atualizar.' }
+
+  await db.update(apostilas).set({
+    ...(data.title && { title: data.title }),
+    ...(data.contentHtml !== undefined && { contentHtml: data.contentHtml }),
+  }).where(eq(apostilas.id, id))
+
+  revalidatePath('/admin/materials')
+  return { success: true }
+}
+
 export async function getApostilaContent(id: string): Promise<{ title: string; contentHtml: string } | null> {
   const { apostilas } = await import('@/lib/db/schema')
   const rows = await db.select({ title: apostilas.title, contentHtml: apostilas.contentHtml })
