@@ -19,7 +19,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <AISettingsForm initialSettings={settings} />
+      <AISettingsForm initialSettings={{ provider: settings.provider, model: settings.model }} />
     </div>
   )
 }

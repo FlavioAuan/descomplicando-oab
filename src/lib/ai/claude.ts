@@ -39,18 +39,19 @@ async function loadSettings(): Promise<CachedSettings> {
       expiresAt: Date.now() + CACHE_TTL_MS,
     }
   } catch {
-    // Fall back to env vars if DB is unavailable
     const provider: AIProvider = 'openrouter'
     _cache = {
       provider,
       apiKey: process.env.OPENROUTER_API_KEY ?? '',
-      model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
+      model: process.env.OPENROUTER_MODEL ?? 'mistralai/mistral-7b-instruct:free',
       baseUrl: BASE_URLS[provider],
       expiresAt: Date.now() + CACHE_TTL_MS,
     }
   }
 
-  if (!_cache.apiKey) throw new Error('Nenhuma chave de API configurada. Acesse Configurações IA.')
+  if (!_cache.apiKey) throw new Error(
+    'Nenhuma chave de API configurada. Defina GROQ_API_KEY, OPENROUTER_API_KEY ou OPENAI_API_KEY nas variáveis de ambiente.'
+  )
   return _cache
 }
 
@@ -66,40 +67,62 @@ function buildHeaders(apiKey: string, provider: AIProvider): Record<string, stri
   return headers
 }
 
-// ─── Non-streaming ────────────────────────────────────────────────────────────
+// ─── Parse error body ─────────────────────────────────────────────────────────
 
-export async function callClaude(
-  prompt: string,
-  systemPrompt?: string,
-  options?: { maxTokens?: number; temperature?: number }
+function parseErrorBody(body: string): string {
+  try {
+    const parsed = JSON.parse(body)
+    return parsed.error?.message ?? body
+  } catch {
+    return body
+  }
+}
+
+// ─── Core fetch (accepts explicit settings, enabling fallback) ────────────────
+
+async function fetchCompletion(
+  messages: { role: string; content: string }[],
+  settings: CachedSettings,
+  maxTokens: number,
+  temperature: number
 ): Promise<string> {
-  const { baseUrl, apiKey, model, provider } = await loadSettings()
-
-  const messages: { role: string; content: string }[] = []
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
-  messages.push({ role: 'user', content: prompt })
+  const { baseUrl, apiKey, model, provider } = settings
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: buildHeaders(apiKey, provider),
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.7,
-    }),
+    body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
   })
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`${provider} ${res.status}: ${body}`)
+    const errMsg = parseErrorBody(body)
+
+    // Auto-fallback: Groq daily/rate limit → OpenRouter (transparent, this request only)
+    if (provider === 'groq' && res.status === 429) {
+      const orKey = process.env.OPENROUTER_API_KEY
+      if (orKey) {
+        const fallbackModel = process.env.OPENROUTER_MODEL ?? 'mistralai/mistral-7b-instruct:free'
+        console.warn(`[AI] Groq limite atingido. Usando OpenRouter (${fallbackModel}) para esta requisição.`)
+        return fetchCompletion(messages, {
+          provider: 'openrouter',
+          apiKey: orKey,
+          model: fallbackModel,
+          baseUrl: BASE_URLS.openrouter,
+          expiresAt: 0,
+        }, maxTokens, temperature)
+      }
+      throw new Error(`Groq: limite diário de tokens atingido e OPENROUTER_API_KEY não está configurada para fallback automático. Resposta: ${errMsg}`)
+    }
+
+    throw new Error(`Erro ${provider} (${res.status}): ${errMsg}`)
   }
 
   const data = await res.json()
   const choice = data.choices?.[0]
   const msg = choice?.message
 
-  // Gemini via OpenRouter may return content as an array of parts instead of a plain string
+  // Handle Gemini-style array content (parts instead of plain string)
   let rawContent: string
   if (typeof msg?.content === 'string') {
     rawContent = msg.content
@@ -123,13 +146,29 @@ export async function callClaude(
     const reason = choice?.finish_reason ?? 'unknown'
     const usedModel = data.model ?? model
     const hint = reason === 'length'
-      ? 'O modelo esgotou os tokens durante o raciocínio interno. Use google/gemini-flash-1.5 em Configurações IA.'
-      : 'Acesse Configurações IA e troque o modelo para google/gemini-flash-1.5'
-    console.error('[callClaude] empty content:', usedModel, 'finish_reason:', reason)
+      ? 'O modelo esgotou os tokens. Tente um modelo com contexto maior em Configurações IA.'
+      : 'Acesse Configurações IA e troque o modelo.'
+    console.error('[AI] empty content:', usedModel, 'finish_reason:', reason)
     throw new Error(`Modelo ${usedModel} retornou resposta vazia. ${hint}`)
   }
 
   return content
+}
+
+// ─── Non-streaming ────────────────────────────────────────────────────────────
+
+export async function callClaude(
+  prompt: string,
+  systemPrompt?: string,
+  options?: { maxTokens?: number; temperature?: number }
+): Promise<string> {
+  const settings = await loadSettings()
+
+  const messages: { role: string; content: string }[] = []
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+  messages.push({ role: 'user', content: prompt })
+
+  return fetchCompletion(messages, settings, options?.maxTokens ?? 4096, options?.temperature ?? 0.7)
 }
 
 // ─── JSON ─────────────────────────────────────────────────────────────────────
@@ -142,12 +181,12 @@ export async function callClaudeJSON<T>(
   const sys = `${systemPrompt ?? ''}\n\nResponda SEMPRE em JSON válido, sem markdown, sem explicações adicionais.`.trim()
   const text = await callClaude(prompt, sys, options)
 
-  // Quick sanity check: if there's no JSON structure at all, give an actionable error
+  // Quick check: if there's no JSON structure, it's a safety message or wrong model
   if (!text.includes('{') && !text.includes('[')) {
-    console.error('[callClaudeJSON] no JSON in response:', text)
+    console.error('[AI] no JSON in response:', text)
     throw new Error(
-      `O modelo não retornou JSON. Isso ocorre com modelos gratuitos (ex: openrouter/free) que ativam filtros de segurança. ` +
-      `Acesse Configurações IA e troque para "google/gemini-flash-1.5" ou outro modelo pago. ` +
+      `O modelo não retornou JSON. Isso ocorre com modelos que ativam filtros de segurança. ` +
+      `Acesse Configurações IA e troque o modelo (recomendado: llama-3.1-8b-instant no Groq). ` +
       `Resposta recebida: "${text.substring(0, 120)}"`
     )
   }
@@ -173,7 +212,7 @@ export async function callClaudeJSON<T>(
 
     return JSON.parse(clean) as T
   } catch {
-    console.error('[callClaudeJSON] parse failed. Raw response:\n', text)
+    console.error('[AI] JSON parse failed. Raw:\n', text)
     throw new Error(
       `IA retornou JSON inválido. Tente trocar o modelo em Configurações IA. ` +
       `Resposta: ${text.substring(0, 300)}`
@@ -196,17 +235,12 @@ export async function* streamClaude(
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: buildHeaders(apiKey, provider),
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: 8192,
-      stream: true,
-    }),
+    body: JSON.stringify({ model, messages, max_tokens: 8192, stream: true }),
   })
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`${provider} stream ${res.status}: ${body}`)
+    throw new Error(`Erro ${provider} stream (${res.status}): ${parseErrorBody(body)}`)
   }
 
   const reader = res.body!.getReader()

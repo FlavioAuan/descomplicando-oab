@@ -5,21 +5,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { saveAISettings, fetchOpenRouterFreeModels } from '@/server/actions/settings'
-import type { AISettings, AIProvider } from '@/server/actions/settings'
+import type { AIProvider } from '@/server/actions/settings'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Info } from 'lucide-react'
 
-const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: string; freeModels?: string[] }[] = [
-  {
-    id: 'openrouter',
-    label: 'OpenRouter',
-    hint: 'Acesse openrouter.ai para obter sua chave. Use "Buscar modelos gratuitos" para ver os disponíveis.',
-    defaultModel: 'meta-llama/llama-3.1-8b-instruct:free',
-  },
+interface ProviderDef {
+  id: AIProvider
+  label: string
+  envKey: string
+  defaultModel: string
+  freeModels?: string[]
+  note?: string
+}
+
+const PROVIDERS: ProviderDef[] = [
   {
     id: 'groq',
-    label: 'Groq (gratuito)',
-    hint: 'Acesse console.groq.com para obter sua chave gratuitamente.',
+    label: 'Groq (recomendado — gratuito)',
+    envKey: 'GROQ_API_KEY',
     defaultModel: 'llama-3.1-8b-instant',
     freeModels: [
       'llama-3.1-8b-instant',
@@ -30,44 +33,49 @@ const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: st
       'deepseek-r1-distill-llama-70b',
       'qwen-qwq-32b',
     ],
+    note: 'Se o limite diário for atingido, o sistema usa OpenRouter automaticamente (se OPENROUTER_API_KEY estiver configurada).',
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    envKey: 'OPENROUTER_API_KEY',
+    defaultModel: 'mistralai/mistral-7b-instruct:free',
+    note: 'Use "Buscar modelos gratuitos" para ver os modelos disponíveis com sua chave.',
   },
   {
     id: 'openai',
-    label: 'OpenAI',
-    hint: 'Acesse platform.openai.com para obter sua chave.',
+    label: 'OpenAI (pago)',
+    envKey: 'OPENAI_API_KEY',
     defaultModel: 'gpt-4o-mini',
+    freeModels: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
   },
 ]
 
 interface Props {
-  initialSettings: AISettings
+  initialSettings: { provider: AIProvider; model: string }
 }
 
 export function AISettingsForm({ initialSettings }: Props) {
-  // Normalize legacy 'grok' value saved before the rename to 'groq'
   const normalizeProvider = (p: string): AIProvider =>
-    PROVIDERS.find(x => x.id === p) ? (p as AIProvider) : PROVIDERS[0].id
+    PROVIDERS.find(x => x.id === p) ? (p as AIProvider) : 'groq'
 
   const [provider, setProvider] = useState<AIProvider>(normalizeProvider(initialSettings.provider))
-  const [apiKey, setApiKey] = useState(initialSettings.apiKey)
   const [model, setModel] = useState(initialSettings.model)
-  const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
   const [freeModels, setFreeModels] = useState<{ id: string; name: string }[]>([])
 
   function handleProviderChange(p: AIProvider) {
     setProvider(p)
-    const def = PROVIDERS.find(x => x.id === p)?.defaultModel ?? ''
-    setModel(def)
-    setApiKey('')
+    setModel(PROVIDERS.find(x => x.id === p)?.defaultModel ?? '')
+    setFreeModels([])
   }
 
   async function handleFetchModels() {
     setLoadingModels(true)
     const models = await fetchOpenRouterFreeModels()
     if (models.length === 0) {
-      toast.error('Nenhum modelo gratuito encontrado. Verifique a chave de API.')
+      toast.error('Nenhum modelo gratuito encontrado. Verifique se OPENROUTER_API_KEY está definida no .env.')
     } else {
       setFreeModels(models)
       toast.success(`${models.length} modelos gratuitos encontrados`)
@@ -78,11 +86,11 @@ export function AISettingsForm({ initialSettings }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const result = await saveAISettings({ provider, apiKey, model })
+    const result = await saveAISettings({ provider, model })
     if ('error' in result) {
       toast.error(result.error)
     } else {
-      toast.success('Configurações salvas com sucesso')
+      toast.success('Configurações salvas')
     }
     setSaving(false)
   }
@@ -91,14 +99,30 @@ export function AISettingsForm({ initialSettings }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-xl border p-6 shadow-sm">
+
+      {/* Env var notice */}
+      <div className="flex gap-3 p-4 rounded-lg bg-amber-50 border border-amber-200">
+        <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-amber-800 space-y-1.5">
+          <p className="font-semibold">Chaves de API — variáveis de ambiente</p>
+          <p>As chaves nunca são salvas no banco de dados. Defina-as no arquivo <code className="bg-amber-100 px-1 rounded font-mono text-xs">.env.local</code>:</p>
+          <div className="font-mono text-xs bg-amber-100 rounded p-2 space-y-0.5">
+            <p>GROQ_API_KEY=sua-chave-groq</p>
+            <p>OPENROUTER_API_KEY=sua-chave-openrouter</p>
+            <p>OPENAI_API_KEY=sua-chave-openai</p>
+          </div>
+          <p className="text-xs">Obtenha as chaves em: <strong>console.groq.com</strong> · <strong>openrouter.ai</strong> · <strong>platform.openai.com</strong></p>
+        </div>
+      </div>
+
       {/* Provider selector */}
       <div className="space-y-3">
-        <Label className="text-sm font-semibold text-gray-700">Provedor de IA</Label>
+        <Label className="text-sm font-semibold text-gray-700">Provedor de IA ativo</Label>
         <div className="grid gap-2">
           {PROVIDERS.map(p => (
             <label
               key={p.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 provider === p.id
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300'
@@ -110,46 +134,21 @@ export function AISettingsForm({ initialSettings }: Props) {
                 value={p.id}
                 checked={provider === p.id}
                 onChange={() => handleProviderChange(p.id)}
-                className="accent-blue-600"
+                className="accent-blue-600 mt-0.5"
               />
-              <span className="text-sm font-medium text-gray-800">{p.label}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800">{p.label}</p>
+                <p className="text-xs text-gray-400 font-mono">{p.envKey}</p>
+                {p.note && <p className="text-xs text-gray-500 mt-1">{p.note}</p>}
+              </div>
             </label>
           ))}
-        </div>
-        <p className="text-xs text-gray-500">{currentProvider.hint}</p>
-      </div>
-
-      {/* API Key */}
-      <div className="space-y-1.5">
-        <Label htmlFor="apiKey" className="text-sm font-semibold text-gray-700">
-          Chave de API
-        </Label>
-        <div className="relative">
-          <Input
-            id="apiKey"
-            type={showKey ? 'text' : 'password'}
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            placeholder="sk-..."
-            required
-            className="pr-10 font-mono text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey(v => !v)}
-            className="absolute inset-y-0 right-2 flex items-center text-gray-400 hover:text-gray-600"
-            tabIndex={-1}
-          >
-            {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
       {/* Model */}
       <div className="space-y-1.5">
-        <Label htmlFor="model" className="text-sm font-semibold text-gray-700">
-          Modelo
-        </Label>
+        <Label htmlFor="model" className="text-sm font-semibold text-gray-700">Modelo</Label>
         <Input
           id="model"
           value={model}
@@ -158,13 +157,14 @@ export function AISettingsForm({ initialSettings }: Props) {
           required
           className="font-mono text-sm"
         />
-        {/* OpenRouter: fetch real free models from API */}
+
+        {/* OpenRouter: fetch live free models */}
         {provider === 'openrouter' && (
           <div className="space-y-2 pt-1">
             <button
               type="button"
               onClick={handleFetchModels}
-              disabled={loadingModels || !apiKey}
+              disabled={loadingModels}
               className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
             >
               {loadingModels
@@ -196,7 +196,7 @@ export function AISettingsForm({ initialSettings }: Props) {
           </div>
         )}
 
-        {/* Groq / outros: modelos fixos conhecidos */}
+        {/* Groq / OpenAI: fixed model list */}
         {currentProvider.freeModels && provider !== 'openrouter' && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {currentProvider.freeModels.map(m => (
