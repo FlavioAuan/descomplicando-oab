@@ -55,10 +55,6 @@ export async function getAISettings(): Promise<AISettings> {
   }
 }
 
-// Returns the OpenRouter key from env (used for automatic fallback)
-export function getOpenRouterFallbackKey(): string {
-  return process.env.OPENROUTER_API_KEY ?? ''
-}
 
 const saveSchema = z.object({
   provider: z.enum(['openrouter', 'openai', 'groq']),
