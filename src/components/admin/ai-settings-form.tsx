@@ -44,7 +44,11 @@ interface Props {
 }
 
 export function AISettingsForm({ initialSettings }: Props) {
-  const [provider, setProvider] = useState<AIProvider>(initialSettings.provider)
+  // Normalize legacy 'grok' value saved before the rename to 'groq'
+  const normalizeProvider = (p: string): AIProvider =>
+    PROVIDERS.find(x => x.id === p) ? (p as AIProvider) : PROVIDERS[0].id
+
+  const [provider, setProvider] = useState<AIProvider>(normalizeProvider(initialSettings.provider))
   const [apiKey, setApiKey] = useState(initialSettings.apiKey)
   const [model, setModel] = useState(initialSettings.model)
   const [showKey, setShowKey] = useState(false)
@@ -83,7 +87,7 @@ export function AISettingsForm({ initialSettings }: Props) {
     setSaving(false)
   }
 
-  const currentProvider = PROVIDERS.find(p => p.id === provider)!
+  const currentProvider = PROVIDERS.find(p => p.id === provider) ?? PROVIDERS[0]
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-xl border p-6 shadow-sm">

@@ -29,7 +29,9 @@ export async function getAISettings(): Promise<AISettings> {
 
     const map = Object.fromEntries(rows.map(r => [r.key, r.value]))
 
-    const provider = (map['ai_provider'] as AIProvider) || 'openrouter'
+    // Migrate legacy 'grok' value saved before rename to 'groq'
+    const rawProvider = map['ai_provider'] === 'grok' ? 'groq' : map['ai_provider']
+    const provider = (rawProvider as AIProvider) || 'openrouter'
     const apiKey = map['ai_api_key'] || process.env.OPENROUTER_API_KEY || ''
     const model = map['ai_model'] || process.env.OPENROUTER_MODEL || PROVIDER_DEFAULTS[provider]
 
