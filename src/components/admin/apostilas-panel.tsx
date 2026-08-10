@@ -21,6 +21,28 @@ import type { ApostilaListItem } from '@/server/actions/apostilas'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
 
+// ─── Apostila shared CSS ──────────────────────────────────────────────────────
+
+const APOSTILA_CSS = `
+  *{box-sizing:border-box}
+  .apostila-body{font-family:Georgia,serif;color:#111;line-height:1.75;font-size:15px}
+  .apostila-body h1{font-size:22px;color:#1a3a5c;border-bottom:3px solid #1a56db;padding-bottom:10px;margin-bottom:24px}
+  .apostila-body h2{font-size:17px;color:#1a3a5c;margin-top:36px;margin-bottom:10px;padding-left:12px;border-left:4px solid #1a56db}
+  .apostila-body h3{font-size:15px;color:#2d4a6e;margin-top:20px;margin-bottom:8px}
+  .apostila-body h4{font-size:14px;color:#2d4a6e;margin-top:16px;margin-bottom:6px}
+  .apostila-body p{margin:10px 0;text-align:justify}
+  .apostila-body ul,.apostila-body ol{padding-left:24px;margin:10px 0}
+  .apostila-body li{margin:5px 0}
+  .apostila-body strong{color:#1a3a5c;font-weight:700}
+  .apostila-body em{color:#555;font-style:italic}
+  .apostila-body blockquote{border-left:3px solid #93c5fd;padding:10px 16px;margin:14px 0;background:#eff6ff;color:#1e40af;border-radius:0 6px 6px 0}
+  .apostila-body table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  .apostila-body th{background:#1a3a5c;color:#fff;padding:8px 12px;text-align:left;font-weight:600}
+  .apostila-body td{padding:7px 12px;border:1px solid #dbeafe}
+  .apostila-body tr:nth-child(even) td{background:#f0f7ff}
+  .apostila-body hr{border:none;border-top:1px solid #e2e8f0;margin:24px 0}
+`
+
 // ─── PDF generation ───────────────────────────────────────────────────────────
 
 function openApostilaPrintWindow(title: string, html: string) {
@@ -32,23 +54,8 @@ function openApostilaPrintWindow(title: string, html: string) {
 <meta charset="UTF-8">
 <title>${title}</title>
 <style>
-  *{box-sizing:border-box}
-  body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:20px;color:#111;line-height:1.75;font-size:15px}
-  h1{font-size:22px;color:#1a3a5c;border-bottom:3px solid #1a56db;padding-bottom:10px;margin-bottom:24px}
-  h2{font-size:17px;color:#1a3a5c;margin-top:36px;margin-bottom:10px;padding-left:12px;border-left:4px solid #1a56db}
-  h3{font-size:15px;color:#2d4a6e;margin-top:20px;margin-bottom:8px}
-  h4{font-size:14px;color:#2d4a6e;margin-top:16px;margin-bottom:6px}
-  p{margin:10px 0;text-align:justify}
-  ul,ol{padding-left:24px;margin:10px 0}
-  li{margin:5px 0}
-  strong{color:#1a3a5c;font-weight:700}
-  em{color:#555;font-style:italic}
-  blockquote{border-left:3px solid #93c5fd;padding:10px 16px;margin:14px 0;background:#eff6ff;color:#1e40af;border-radius:0 6px 6px 0}
-  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
-  th{background:#1a3a5c;color:#fff;padding:8px 12px;text-align:left;font-weight:600}
-  td{padding:7px 12px;border:1px solid #dbeafe}
-  tr:nth-child(even) td{background:#f0f7ff}
-  hr{border:none;border-top:1px solid #e2e8f0;margin:24px 0}
+  ${APOSTILA_CSS.replace(/\.apostila-body/g, 'body')}
+  body{max-width:800px;margin:40px auto;padding:20px}
   @media print{body{margin:20px;max-width:none}}
 </style>
 </head>
@@ -87,8 +94,8 @@ function ApostilaViewer({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div
-          className="prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: html }}
+          className="apostila-body"
+          dangerouslySetInnerHTML={{ __html: `<style>${APOSTILA_CSS}</style>${html}` }}
         />
       </DialogContent>
     </Dialog>
@@ -188,8 +195,8 @@ function EditApostilaDialog({
                 />
               ) : (
                 <div
-                  className="w-full h-full overflow-y-auto p-6 prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: editHtml }}
+                  className="apostila-body w-full h-full overflow-y-auto p-6"
+                  dangerouslySetInnerHTML={{ __html: `<style>${APOSTILA_CSS}</style>${editHtml}` }}
                 />
               )}
             </div>
