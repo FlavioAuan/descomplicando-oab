@@ -469,9 +469,17 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
     setPreviewTitle(result.data.title)
     setViewerOpen(true)
 
+    // Optimistic add — appears in list immediately without refresh
+    const matchedSubject = subjects.find(s => s.name.toLowerCase() === discipline.toLowerCase())
+    setApostilasList(prev => [{
+      id: result.data.id,
+      title: result.data.title,
+      generatedAt: new Date(),
+      subjectName: matchedSubject?.name ?? null,
+    }, ...prev])
+
     // Reset form
     setTitle(''); setDiscipline(''); setSubtheme(''); setFiles([])
-    router.refresh()
   }
 
   return (
