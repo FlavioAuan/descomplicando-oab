@@ -96,7 +96,17 @@ export async function callClaude(
   }
 
   const data = await res.json()
-  return (data.choices?.[0]?.message?.content as string) ?? ''
+  const choice = data.choices?.[0]
+  const content = (choice?.message?.content as string) ?? ''
+
+  if (!content) {
+    console.error('[callClaude] empty content. Full response:', JSON.stringify(data, null, 2))
+    const reason = choice?.finish_reason ?? 'unknown'
+    const usedModel = data.model ?? model
+    throw new Error(`Modelo ${usedModel} retornou resposta vazia (finish_reason: ${reason})`)
+  }
+
+  return content
 }
 
 // ─── JSON ─────────────────────────────────────────────────────────────────────
