@@ -118,6 +118,39 @@ export async function getExerciseSetWithQuestions(id: string): Promise<{
   }
 }
 
+export async function updateExerciseSetQuestions(
+  setId: string,
+  data: {
+    title: string
+    questions: Array<{
+      id: string
+      statement: string
+      alternatives: { a: string; b: string; c: string; d: string }
+      correctAnswer: string
+      explanation: string | null
+    }>
+  }
+): Promise<{ success: true } | { error: string }> {
+  await requireRole('admin', 'super_admin')
+
+  await db.update(exerciseSets).set({ title: data.title }).where(eq(exerciseSets.id, setId))
+
+  for (const q of data.questions) {
+    await db
+      .update(exerciseQuestions)
+      .set({
+        statement: q.statement,
+        alternatives: q.alternatives,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+      })
+      .where(eq(exerciseQuestions.id, q.id))
+  }
+
+  revalidatePath('/admin/exercises')
+  return { success: true }
+}
+
 // ─── Student Actions ──────────────────────────────────────────────────────────
 
 export async function saveExerciseProgress(
