@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { saveAISettings } from '@/server/actions/settings'
+import { saveAISettings, fetchOpenRouterFreeModels } from '@/server/actions/settings'
 import type { AISettings, AIProvider } from '@/server/actions/settings'
 import { toast } from 'sonner'
-import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Eye, EyeOff, RefreshCw } from 'lucide-react'
 
 const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: string; freeModels?: string[] }[] = [
   {
@@ -48,12 +48,26 @@ export function AISettingsForm({ initialSettings }: Props) {
   const [model, setModel] = useState(initialSettings.model)
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [freeModels, setFreeModels] = useState<{ id: string; name: string }[]>([])
 
   function handleProviderChange(p: AIProvider) {
     setProvider(p)
     const def = PROVIDERS.find(x => x.id === p)?.defaultModel ?? ''
     setModel(def)
     setApiKey('')
+  }
+
+  async function handleFetchModels() {
+    setLoadingModels(true)
+    const models = await fetchOpenRouterFreeModels()
+    if (models.length === 0) {
+      toast.error('Nenhum modelo gratuito encontrado. Verifique a chave de API.')
+    } else {
+      setFreeModels(models)
+      toast.success(`${models.length} modelos gratuitos encontrados`)
+    }
+    setLoadingModels(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -139,22 +153,40 @@ export function AISettingsForm({ initialSettings }: Props) {
           required
           className="font-mono text-sm"
         />
-        {currentProvider.freeModels && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {currentProvider.freeModels.map(m => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setModel(m)}
-                className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
-                  model === m
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
+        {provider === 'openrouter' && (
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={handleFetchModels}
+              disabled={loadingModels || !apiKey}
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
+            >
+              {loadingModels
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <RefreshCw className="w-3 h-3" />}
+              Buscar modelos gratuitos disponíveis
+            </button>
+            {freeModels.length > 0 && (
+              <div className="max-h-48 overflow-y-auto flex flex-col gap-1 border rounded-lg p-2 bg-gray-50">
+                {freeModels.map(m => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setModel(m.id)}
+                    className={`text-left text-xs px-2 py-1 rounded transition-colors ${
+                      model === m.id
+                        ? 'bg-blue-600 text-white'
+                        : 'hover:bg-blue-50 text-gray-700'
+                    }`}
+                  >
+                    <span className="font-mono">{m.id}</span>
+                    {m.name && m.name !== m.id && (
+                      <span className="ml-2 text-gray-400 font-sans">{m.name}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

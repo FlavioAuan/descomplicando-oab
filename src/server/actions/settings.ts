@@ -49,6 +49,29 @@ const saveSchema = z.object({
   model: z.string().min(1, 'Modelo obrigatório'),
 })
 
+export async function fetchOpenRouterFreeModels(): Promise<
+  { id: string; name: string }[]
+> {
+  const settings = await getAISettings()
+  if (!settings.apiKey) return []
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${settings.apiKey}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+
+    const data = await res.json()
+    return ((data.data ?? []) as { id: string; name: string; pricing?: { prompt: string } }[])
+      .filter(m => m.id.endsWith(':free'))
+      .map(m => ({ id: m.id, name: m.name }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  } catch {
+    return []
+  }
+}
+
 export async function saveAISettings(
   input: AISettings
 ): Promise<{ success: true } | { error: string }> {
