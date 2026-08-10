@@ -19,7 +19,12 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <AISettingsForm initialSettings={{ provider: settings.provider, model: settings.model }} />
+      <AISettingsForm initialSettings={{
+        provider: settings.provider,
+        groqModel: settings.groqModel,
+        openrouterModel: settings.openrouterModel,
+        openaiModel: settings.openaiModel,
+      }} />
     </div>
   )
 }

@@ -33,7 +33,7 @@ const PROVIDERS: ProviderDef[] = [
       'deepseek-r1-distill-llama-70b',
       'qwen-qwq-32b',
     ],
-    note: 'Se o limite diário for atingido, o sistema usa OpenRouter automaticamente (se OPENROUTER_API_KEY estiver configurada).',
+    note: 'Quando o limite diário for atingido, o sistema usa OpenRouter automaticamente com o modelo configurado abaixo.',
   },
   {
     id: 'openrouter',
@@ -52,7 +52,12 @@ const PROVIDERS: ProviderDef[] = [
 ]
 
 interface Props {
-  initialSettings: { provider: AIProvider; model: string }
+  initialSettings: {
+    provider: AIProvider
+    groqModel: string
+    openrouterModel: string
+    openaiModel: string
+  }
 }
 
 export function AISettingsForm({ initialSettings }: Props) {
@@ -60,16 +65,12 @@ export function AISettingsForm({ initialSettings }: Props) {
     PROVIDERS.find(x => x.id === p) ? (p as AIProvider) : 'groq'
 
   const [provider, setProvider] = useState<AIProvider>(normalizeProvider(initialSettings.provider))
-  const [model, setModel] = useState(initialSettings.model)
+  const [groqModel, setGroqModel] = useState(initialSettings.groqModel)
+  const [openrouterModel, setOpenrouterModel] = useState(initialSettings.openrouterModel)
+  const [openaiModel, setOpenaiModel] = useState(initialSettings.openaiModel)
   const [saving, setSaving] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
   const [freeModels, setFreeModels] = useState<{ id: string; name: string }[]>([])
-
-  function handleProviderChange(p: AIProvider) {
-    setProvider(p)
-    setModel(PROVIDERS.find(x => x.id === p)?.defaultModel ?? '')
-    setFreeModels([])
-  }
 
   async function handleFetchModels() {
     setLoadingModels(true)
@@ -86,7 +87,7 @@ export function AISettingsForm({ initialSettings }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const result = await saveAISettings({ provider, model })
+    const result = await saveAISettings({ provider, groqModel, openrouterModel, openaiModel })
     if ('error' in result) {
       toast.error(result.error)
     } else {
@@ -94,8 +95,6 @@ export function AISettingsForm({ initialSettings }: Props) {
     }
     setSaving(false)
   }
-
-  const currentProvider = PROVIDERS.find(p => p.id === provider) ?? PROVIDERS[0]
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-xl border p-6 shadow-sm">
@@ -133,7 +132,7 @@ export function AISettingsForm({ initialSettings }: Props) {
                 name="provider"
                 value={p.id}
                 checked={provider === p.id}
-                onChange={() => handleProviderChange(p.id)}
+                onChange={() => setProvider(p.id)}
                 className="accent-blue-600 mt-0.5"
               />
               <div className="min-w-0">
@@ -146,75 +145,115 @@ export function AISettingsForm({ initialSettings }: Props) {
         </div>
       </div>
 
-      {/* Model */}
+      {/* ── Groq model ── */}
       <div className="space-y-1.5">
-        <Label htmlFor="model" className="text-sm font-semibold text-gray-700">Modelo</Label>
+        <Label htmlFor="groq-model" className="text-sm font-semibold text-gray-700">
+          Modelo Groq
+          {provider !== 'groq' && <span className="ml-1.5 font-normal text-gray-400">(fallback automático quando Groq atinge o limite)</span>}
+        </Label>
         <Input
-          id="model"
-          value={model}
-          onChange={e => setModel(e.target.value)}
-          placeholder={currentProvider.defaultModel}
+          id="groq-model"
+          value={groqModel}
+          onChange={e => setGroqModel(e.target.value)}
+          placeholder="llama-3.1-8b-instant"
           required
           className="font-mono text-sm"
         />
-
-        {/* OpenRouter: fetch live free models */}
-        {provider === 'openrouter' && (
-          <div className="space-y-2 pt-1">
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {PROVIDERS.find(p => p.id === 'groq')!.freeModels!.map(m => (
             <button
+              key={m}
               type="button"
-              onClick={handleFetchModels}
-              disabled={loadingModels}
-              className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
+              onClick={() => setGroqModel(m)}
+              className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
+                groqModel === m
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+              }`}
             >
-              {loadingModels
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <RefreshCw className="w-3 h-3" />}
-              Buscar modelos gratuitos disponíveis
+              {m}
             </button>
-            {freeModels.length > 0 && (
-              <div className="max-h-48 overflow-y-auto flex flex-col gap-1 border rounded-lg p-2 bg-gray-50">
-                {freeModels.map(m => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setModel(m.id)}
-                    className={`text-left text-xs px-2 py-1 rounded transition-colors ${
-                      model === m.id
-                        ? 'bg-blue-600 text-white'
-                        : 'hover:bg-blue-50 text-gray-700'
-                    }`}
-                  >
-                    <span className="font-mono">{m.id}</span>
-                    {m.name && m.name !== m.id && (
-                      <span className="ml-2 text-gray-400 font-sans">{m.name}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          ))}
+        </div>
+      </div>
 
-        {/* Groq / OpenAI: fixed model list */}
-        {currentProvider.freeModels && provider !== 'openrouter' && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {currentProvider.freeModels.map(m => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setModel(m)}
-                className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
-                  model === m
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        )}
+      {/* ── OpenRouter model ── */}
+      <div className="space-y-1.5">
+        <Label htmlFor="openrouter-model" className="text-sm font-semibold text-gray-700">
+          Modelo OpenRouter
+          {provider === 'groq' && <span className="ml-1.5 font-normal text-gray-400">(usado automaticamente quando Groq atinge o limite)</span>}
+        </Label>
+        <Input
+          id="openrouter-model"
+          value={openrouterModel}
+          onChange={e => setOpenrouterModel(e.target.value)}
+          placeholder="mistralai/mistral-7b-instruct:free"
+          required
+          className="font-mono text-sm"
+        />
+        <div className="space-y-2 pt-1">
+          <button
+            type="button"
+            onClick={handleFetchModels}
+            disabled={loadingModels}
+            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
+          >
+            {loadingModels
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <RefreshCw className="w-3 h-3" />}
+            Buscar modelos gratuitos disponíveis
+          </button>
+          {freeModels.length > 0 && (
+            <div className="max-h-48 overflow-y-auto flex flex-col gap-1 border rounded-lg p-2 bg-gray-50">
+              {freeModels.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setOpenrouterModel(m.id)}
+                  className={`text-left text-xs px-2 py-1 rounded transition-colors ${
+                    openrouterModel === m.id
+                      ? 'bg-blue-600 text-white'
+                      : 'hover:bg-blue-50 text-gray-700'
+                  }`}
+                >
+                  <span className="font-mono">{m.id}</span>
+                  {m.name && m.name !== m.id && (
+                    <span className="ml-2 text-gray-400 font-sans">{m.name}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── OpenAI model ── */}
+      <div className="space-y-1.5">
+        <Label htmlFor="openai-model" className="text-sm font-semibold text-gray-700">Modelo OpenAI</Label>
+        <Input
+          id="openai-model"
+          value={openaiModel}
+          onChange={e => setOpenaiModel(e.target.value)}
+          placeholder="gpt-4o-mini"
+          required
+          className="font-mono text-sm"
+        />
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {PROVIDERS.find(p => p.id === 'openai')!.freeModels!.map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setOpenaiModel(m)}
+              className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
+                openaiModel === m
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Button type="submit" disabled={saving} className="w-full">

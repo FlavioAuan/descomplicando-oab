@@ -14,6 +14,7 @@ interface CachedSettings {
   provider: AIProvider
   apiKey: string
   model: string
+  openrouterModel: string  // used for Groq→OpenRouter automatic fallback
   baseUrl: string
   expiresAt: number
 }
@@ -35,15 +36,18 @@ async function loadSettings(): Promise<CachedSettings> {
       provider: s.provider,
       apiKey: s.apiKey,
       model: s.model,
+      openrouterModel: s.openrouterModel,
       baseUrl: BASE_URLS[s.provider],
       expiresAt: Date.now() + CACHE_TTL_MS,
     }
   } catch {
     const provider: AIProvider = 'openrouter'
+    const openrouterModel = process.env.OPENROUTER_MODEL ?? 'mistralai/mistral-7b-instruct:free'
     _cache = {
       provider,
       apiKey: process.env.OPENROUTER_API_KEY ?? '',
-      model: process.env.OPENROUTER_MODEL ?? 'mistralai/mistral-7b-instruct:free',
+      model: openrouterModel,
+      openrouterModel,
       baseUrl: BASE_URLS[provider],
       expiresAt: Date.now() + CACHE_TTL_MS,
     }
@@ -102,12 +106,13 @@ async function fetchCompletion(
     if (provider === 'groq' && res.status === 429) {
       const orKey = process.env.OPENROUTER_API_KEY
       if (orKey) {
-        const fallbackModel = process.env.OPENROUTER_MODEL ?? 'mistralai/mistral-7b-instruct:free'
+        const fallbackModel = settings.openrouterModel || process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free'
         console.warn(`[AI] Groq limite atingido. Usando OpenRouter (${fallbackModel}) para esta requisição.`)
         return fetchCompletion(messages, {
           provider: 'openrouter',
           apiKey: orKey,
           model: fallbackModel,
+          openrouterModel: fallbackModel,
           baseUrl: BASE_URLS.openrouter,
           expiresAt: 0,
         }, maxTokens, temperature)

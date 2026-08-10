@@ -10,8 +10,11 @@ export type AIProvider = 'openrouter' | 'openai' | 'groq'
 
 export interface AISettings {
   provider: AIProvider
-  apiKey: string  // always read from env — never stored in DB
-  model: string
+  apiKey: string        // always read from env — never stored in DB
+  model: string         // active model for the selected provider
+  groqModel: string
+  openrouterModel: string
+  openaiModel: string
 }
 
 const PROVIDER_DEFAULTS: Record<AIProvider, string> = {
@@ -34,23 +37,39 @@ export async function getAISettings(): Promise<AISettings> {
     const rows = await db
       .select()
       .from(systemSettings)
-      .where(inArray(systemSettings.key, ['ai_provider', 'ai_model']))
+      .where(inArray(systemSettings.key, [
+        'ai_provider', 'ai_model',
+        'groq_model', 'openrouter_model', 'openai_model',
+      ]))
 
     const map = Object.fromEntries(rows.map(r => [r.key, r.value]))
 
     // Migrate legacy 'grok' value saved before the rename to 'groq'
     const rawProvider = map['ai_provider'] === 'grok' ? 'groq' : map['ai_provider']
     const provider = (rawProvider as AIProvider) || 'openrouter'
-    const model = map['ai_model'] || process.env.OPENROUTER_MODEL || PROVIDER_DEFAULTS[provider]
+
+    // Per-provider models (fall back to legacy ai_model, then to defaults)
+    const legacyModel = map['ai_model']
+    const groqModel = map['groq_model'] || (provider === 'groq' ? legacyModel : undefined) || PROVIDER_DEFAULTS.groq
+    const openrouterModel = map['openrouter_model'] || (provider === 'openrouter' ? legacyModel : undefined) || process.env.OPENROUTER_MODEL || PROVIDER_DEFAULTS.openrouter
+    const openaiModel = map['openai_model'] || (provider === 'openai' ? legacyModel : undefined) || PROVIDER_DEFAULTS.openai
+
+    // Active model = the model for the selected provider
+    const modelMap: Record<AIProvider, string> = { groq: groqModel, openrouter: openrouterModel, openai: openaiModel }
+    const model = modelMap[provider]
     const apiKey = getApiKeyFromEnv(provider)
 
-    return { provider, apiKey, model }
+    return { provider, apiKey, model, groqModel, openrouterModel, openaiModel }
   } catch {
     const provider: AIProvider = 'openrouter'
+    const openrouterModel = process.env.OPENROUTER_MODEL ?? PROVIDER_DEFAULTS.openrouter
     return {
       provider,
       apiKey: process.env.OPENROUTER_API_KEY ?? '',
-      model: process.env.OPENROUTER_MODEL ?? PROVIDER_DEFAULTS.openrouter,
+      model: openrouterModel,
+      groqModel: PROVIDER_DEFAULTS.groq,
+      openrouterModel,
+      openaiModel: PROVIDER_DEFAULTS.openai,
     }
   }
 }
@@ -58,18 +77,20 @@ export async function getAISettings(): Promise<AISettings> {
 
 const saveSchema = z.object({
   provider: z.enum(['openrouter', 'openai', 'groq']),
-  model: z.string().min(1, 'Modelo obrigatório'),
+  groqModel: z.string().min(1, 'Modelo Groq obrigatório'),
+  openrouterModel: z.string().min(1, 'Modelo OpenRouter obrigatório'),
+  openaiModel: z.string().min(1, 'Modelo OpenAI obrigatório'),
 })
 
 export async function saveAISettings(
-  input: { provider: AIProvider; model: string }
+  input: { provider: AIProvider; groqModel: string; openrouterModel: string; openaiModel: string }
 ): Promise<{ success: true } | { error: string }> {
   await requireRole('admin', 'super_admin')
 
   const parsed = saveSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.errors[0].message }
 
-  const { provider, model } = parsed.data
+  const { provider, groqModel, openrouterModel, openaiModel } = parsed.data
   const now = new Date()
 
   const upsert = (key: string, value: string) =>
@@ -80,7 +101,9 @@ export async function saveAISettings(
 
   await Promise.all([
     upsert('ai_provider', provider),
-    upsert('ai_model', model),
+    upsert('groq_model', groqModel),
+    upsert('openrouter_model', openrouterModel),
+    upsert('openai_model', openaiModel),
     // Remove any previously stored key from the DB for security
     db.delete(systemSettings).where(eq(systemSettings.key, 'ai_api_key')),
   ])
