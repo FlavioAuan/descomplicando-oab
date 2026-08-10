@@ -218,14 +218,21 @@ export class TrainingsRepository extends BaseRepository {
 
   async updateTopic(
     topicId: string,
-    data: { title?: string; type?: string; estimatedMinutes?: number }
+    data: { title?: string; type?: string; estimatedMinutes?: number; contentPatch?: Record<string, string | null> }
   ): Promise<void> {
+    // Merge contentPatch into existing content jsonb
+    let contentUpdate: Record<string, unknown> | undefined
+    if (data.contentPatch) {
+      const [existing] = await this.db.select({ content: trainingTopics.content }).from(trainingTopics).where(eq(trainingTopics.id, topicId))
+      contentUpdate = { ...((existing?.content as Record<string, unknown>) ?? {}), ...data.contentPatch }
+    }
     await this.db
       .update(trainingTopics)
       .set({
         ...(data.title !== undefined && { title: data.title }),
         ...(data.type !== undefined && { type: data.type as any }),
         ...(data.estimatedMinutes !== undefined && { estimatedMinutes: data.estimatedMinutes }),
+        ...(contentUpdate !== undefined && { content: contentUpdate }),
       })
       .where(eq(trainingTopics.id, topicId))
   }

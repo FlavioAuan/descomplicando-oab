@@ -163,7 +163,7 @@ export async function deleteTraining(trainingId: string) {
 
 export async function updateTrainingTopic(
   topicId: string,
-  data: { title?: string; type?: string; estimatedMinutes?: number }
+  data: { title?: string; type?: string; estimatedMinutes?: number; contentPatch?: Record<string, string | null> }
 ) {
   await requireRole('admin', 'super_admin')
   await trainingsRepository.updateTopic(topicId, data)

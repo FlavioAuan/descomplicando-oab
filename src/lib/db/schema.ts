@@ -472,6 +472,58 @@ export const systemSettings = pgTable('system_settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
+// ─── Flashcard Sets (admin-created groups) ────────────────────────────────────
+
+export const flashcardSets = pgTable('flashcard_sets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 300 }).notNull(),
+  apostilaId: uuid('apostila_id').references(() => apostilas.id, { onDelete: 'set null' }),
+  subjectId: uuid('subject_id').references(() => subjects.id),
+  cardCount: integer('card_count').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const flashcardSetCards = pgTable('flashcard_set_cards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  setId: uuid('set_id').notNull().references(() => flashcardSets.id, { onDelete: 'cascade' }),
+  order: integer('order').notNull(),
+  front: text('front').notNull(),
+  back: text('back').notNull(),
+  difficulty: difficultyEnum('difficulty').default('medium'),
+}, (t) => [index('fsc_set_idx').on(t.setId)])
+
+// ─── Exercise Sets (AI-generated from apostilas) ──────────────────────────────
+
+export const exerciseSets = pgTable('exercise_sets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 300 }).notNull(),
+  apostilaId: uuid('apostila_id').references(() => apostilas.id, { onDelete: 'set null' }),
+  subjectId: uuid('subject_id').references(() => subjects.id),
+  questionCount: integer('question_count').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const exerciseQuestions = pgTable('exercise_questions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  setId: uuid('set_id').notNull().references(() => exerciseSets.id, { onDelete: 'cascade' }),
+  order: integer('order').notNull(),
+  statement: text('statement').notNull(),
+  alternatives: jsonb('alternatives').$type<{ a: string; b: string; c: string; d: string }>().notNull(),
+  correctAnswer: varchar('correct_answer', { length: 1 }).notNull(),
+  explanation: text('explanation'),
+}, (t) => [index('eq_set_idx').on(t.setId)])
+
+export const studentExerciseProgress = pgTable('student_exercise_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  setId: uuid('set_id').notNull().references(() => exerciseSets.id, { onDelete: 'cascade' }),
+  answers: jsonb('answers').$type<Record<string, string>>().default({}).notNull(),
+  totalCorrect: integer('total_correct').default(0),
+  totalQuestions: integer('total_questions').default(0),
+  completedAt: timestamp('completed_at'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+}, (t) => [uniqueIndex('sep_user_set_idx').on(t.userId, t.setId)])
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({

@@ -53,7 +53,6 @@ Seções obrigatórias:
 5. <h2>Jurisprudência Relevante</h2> — súmulas e julgados do STF/STJ em <blockquote>; número do acórdão em <strong>negrito</strong>
 6. <h2>⚠️ Pegadinhas e Armadilhas da OAB</h2> — lista <ul> com cada item: <li><strong>Erro comum:</strong> descrição. <em>Correto:</em> resposta.</li>
 7. <h2>Resumo Esquemático</h2> — bullet points <ul><li> do mais importante, estrutura hierárquica com <ul> aninhado
-8. <h2>Questões Comentadas</h2> — 3 questões objetivas: enunciado em <p>, alternativas em <ol type="A"><li>, gabarito e comentário em <p><strong>Gabarito: X</strong> — explicação</p>
 
 Responda SOMENTE com JSON (sem markdown, sem blocos de código):
 {"title":"título da apostila","htmlContent":"<h2>Introdução...</h2><p>...</p>..."}`
@@ -123,6 +122,57 @@ Responda com JSON array:
 }]`
 
   return callClaudeJSON<GeneratedQuestion[]>(prompt, SYSTEM_QUESTIONS, { maxTokens: 6144 })
+}
+
+export async function generateExerciseSet(params: {
+  title: string
+  apostilaContent: string
+  count?: number
+}): Promise<Array<{ statement: string; alternatives: { a: string; b: string; c: string; d: string }; correctAnswer: string; explanation: string }>> {
+  const count = params.count ?? 10
+  const prompt = `Com base no conteúdo da apostila abaixo, crie ${count} questões objetivas no padrão OAB (1ª fase) sobre "${params.title}".
+
+CONTEÚDO DA APOSTILA:
+${params.apostilaContent.replace(/<[^>]+>/g, ' ').substring(0, 4000)}
+
+REGRAS:
+- 4 alternativas (A, B, C, D), apenas uma correta
+- Teste aplicação do direito, não memorização pura
+- Inclua pegadinhas típicas da OAB
+- Explicação deve indicar o erro de cada alternativa errada
+
+Responda SOMENTE com JSON array:
+[{"statement":"enunciado completo","alternatives":{"a":"texto","b":"texto","c":"texto","d":"texto"},"correctAnswer":"a","explanation":"explicação detalhada"}]`
+
+  const result = await callClaudeJSON<Array<{ statement: string; alternatives: { a: string; b: string; c: string; d: string }; correctAnswer: string; explanation: string }>>(
+    prompt, SYSTEM_QUESTIONS, { maxTokens: 6144 }
+  )
+  return Array.isArray(result) ? result : []
+}
+
+export async function generateFlashcardSet(params: {
+  title: string
+  apostilaContent: string
+  count?: number
+}): Promise<Array<{ front: string; back: string; difficulty: 'easy' | 'medium' | 'hard' }>> {
+  const count = params.count ?? 15
+  const prompt = `Com base no conteúdo da apostila abaixo, crie ${count} flashcards para memorização sobre "${params.title}".
+
+CONTEÚDO DA APOSTILA:
+${params.apostilaContent.replace(/<[^>]+>/g, ' ').substring(0, 4000)}
+
+REGRAS:
+- Frente: pergunta objetiva ou termo técnico
+- Verso: resposta completa mas concisa (máx. 3 linhas)
+- Misture: conceitos, artigos de lei, jurisprudência, distinções
+
+Responda SOMENTE com JSON array:
+[{"front":"pergunta ou termo","back":"resposta","difficulty":"easy|medium|hard"}]`
+
+  const result = await callClaudeJSON<Array<{ front: string; back: string; difficulty: 'easy' | 'medium' | 'hard' }>>(
+    prompt, SYSTEM_FLASHCARDS, { maxTokens: 4096 }
+  )
+  return Array.isArray(result) ? result : []
 }
 
 // Generates a single batch of up to BATCH_SIZE business days.

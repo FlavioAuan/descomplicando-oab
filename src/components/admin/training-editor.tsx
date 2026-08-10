@@ -29,6 +29,8 @@ import {
   linkApostilaToTopic,
   createApostilaForTopic,
 } from '@/server/actions/apostilas'
+import { listExerciseSets } from '@/server/actions/exercises'
+import { listFlashcardSets } from '@/server/actions/flashcard-sets'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
@@ -179,7 +181,66 @@ function ApostilaPicker({
   )
 }
 
+// ── Generic content picker (exercises, flashcard sets) ────────────────────────
+
+type ContentOption = { id: string; title: string }
+
+function ContentPicker({
+  type,
+  onSelect,
+}: {
+  type: 'exercise' | 'flashcard'
+  onSelect: (id: string | null) => void
+}) {
+  const [options, setOptions] = useState<ContentOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState('')
+
+  const label = type === 'exercise' ? 'Exercícios' : 'Flashcards'
+  const color = type === 'exercise' ? 'purple' : 'green'
+
+  useEffect(() => {
+    const loader = type === 'exercise' ? listExerciseSets() : listFlashcardSets()
+    loader.then((list: ContentOption[]) => { setOptions(list); setLoading(false) })
+  }, [type])
+
+  return (
+    <div className={`space-y-2 rounded-lg border border-${color}-100 bg-${color}-50 p-3`}>
+      <p className={`text-xs font-semibold text-${color}-700 uppercase tracking-wide`}>Vincular {label}</p>
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Loader2 className="w-3 h-3 animate-spin" /> Carregando…
+        </div>
+      ) : (
+        <Select value={selectedId} onValueChange={v => { setSelectedId(v); onSelect(v || null) }}>
+          <SelectTrigger className="bg-white text-sm h-8">
+            <SelectValue placeholder={`— Selecionar conjunto de ${label.toLowerCase()} —`} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.length === 0 && (
+              <SelectItem value="__none" disabled>Nenhum conjunto disponível</SelectItem>
+            )}
+            {options.map(o => (
+              <SelectItem key={o.id} value={o.id}>{o.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  )
+}
+
 // ── Edit topic dialog ──────────────────────────────────────────────────────────
+
+type TopicSaveData = {
+  title: string
+  type: string
+  estimatedMinutes: number
+  apostilaId?: string
+  uploadFile?: File
+  exerciseSetId?: string
+  flashcardSetId?: string
+}
 
 function EditTopicDialog({
   topic,
@@ -190,13 +251,15 @@ function EditTopicDialog({
   topic: Topic
   open: boolean
   onClose: () => void
-  onSave: (data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) => Promise<void>
+  onSave: (data: TopicSaveData) => Promise<void>
 }) {
   const [title, setTitle] = useState(topic.title)
   const [type, setType] = useState(topic.type)
   const [minutes, setMinutes] = useState(topic.estimatedMinutes ?? 45)
   const [apostilaId, setApostilaId] = useState<string | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [exerciseSetId, setExerciseSetId] = useState<string | null>(null)
+  const [flashcardSetId, setFlashcardSetId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -207,6 +270,8 @@ function EditTopicDialog({
       estimatedMinutes: minutes,
       apostilaId: apostilaId ?? undefined,
       uploadFile: uploadFile ?? undefined,
+      exerciseSetId: exerciseSetId ?? undefined,
+      flashcardSetId: flashcardSetId ?? undefined,
     })
     setSaving(false)
     onClose()
@@ -225,7 +290,7 @@ function EditTopicDialog({
           </div>
           <div className="space-y-2">
             <Label>Tipo</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={v => { setType(v); setExerciseSetId(null); setFlashcardSetId(null); setApostilaId(null); setUploadFile(null) }}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -254,6 +319,12 @@ function EditTopicDialog({
               onSelect={(id, file) => { setApostilaId(id); setUploadFile(file) }}
             />
           )}
+          {type === 'exercise' && (
+            <ContentPicker type="exercise" onSelect={id => setExerciseSetId(id)} />
+          )}
+          {type === 'flashcard' && (
+            <ContentPicker type="flashcard" onSelect={id => setFlashcardSetId(id)} />
+          )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -276,13 +347,15 @@ function AddTopicDialog({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) => Promise<void>
+  onAdd: (data: TopicSaveData) => Promise<void>
 }) {
   const [title, setTitle] = useState('')
   const [type, setType] = useState('apostila')
   const [minutes, setMinutes] = useState(45)
   const [apostilaId, setApostilaId] = useState<string | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [exerciseSetId, setExerciseSetId] = useState<string | null>(null)
+  const [flashcardSetId, setFlashcardSetId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleAdd() {
@@ -294,6 +367,8 @@ function AddTopicDialog({
       estimatedMinutes: minutes,
       apostilaId: apostilaId ?? undefined,
       uploadFile: uploadFile ?? undefined,
+      exerciseSetId: exerciseSetId ?? undefined,
+      flashcardSetId: flashcardSetId ?? undefined,
     })
     setSaving(false)
     setTitle('')
@@ -301,6 +376,8 @@ function AddTopicDialog({
     setMinutes(45)
     setApostilaId(null)
     setUploadFile(null)
+    setExerciseSetId(null)
+    setFlashcardSetId(null)
     onClose()
   }
 
@@ -321,7 +398,7 @@ function AddTopicDialog({
           </div>
           <div className="space-y-2">
             <Label>Tipo</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={v => { setType(v); setExerciseSetId(null); setFlashcardSetId(null); setApostilaId(null); setUploadFile(null) }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {TOPIC_TYPES.map(t => (
@@ -348,6 +425,12 @@ function AddTopicDialog({
               onSelect={(id, file) => { setApostilaId(id); setUploadFile(file) }}
             />
           )}
+          {type === 'exercise' && (
+            <ContentPicker type="exercise" onSelect={id => setExerciseSetId(id)} />
+          )}
+          {type === 'flashcard' && (
+            <ContentPicker type="flashcard" onSelect={id => setFlashcardSetId(id)} />
+          )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -367,11 +450,17 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [addingTopic, setAddingTopic] = useState(false)
 
-  async function handleUpdateTopic(
-    topicId: string,
-    data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }
-  ) {
-    const result = await updateTrainingTopic(topicId, data)
+  async function handleUpdateTopic(topicId: string, data: TopicSaveData) {
+    const contentPatch: Record<string, string | null> = {}
+    if (data.exerciseSetId) contentPatch.exerciseSetId = data.exerciseSetId
+    if (data.flashcardSetId) contentPatch.flashcardSetId = data.flashcardSetId
+
+    const result = await updateTrainingTopic(topicId, {
+      title: data.title,
+      type: data.type,
+      estimatedMinutes: data.estimatedMinutes,
+      ...(Object.keys(contentPatch).length > 0 && { contentPatch }),
+    })
     if ('error' in result) { toast.error('Erro ao salvar'); return }
 
     if (data.apostilaId) {
@@ -394,7 +483,7 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
     else { toast.success('Atividade removida'); onRefresh() }
   }
 
-  async function handleAddTopic(data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) {
+  async function handleAddTopic(data: TopicSaveData) {
     const nextOrder = (day.topics.at(-1)?.order ?? 0) + 1
     const result = await addTrainingTopic(day.id, { ...data, order: nextOrder })
     if ('error' in result) { toast.error('Erro ao adicionar'); return }
@@ -407,6 +496,13 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
       fd.append('files', data.uploadFile)
       const res = await createApostilaForTopic(result.id, fd)
       if ('error' in res) toast.error(`Erro ao gerar apostila: ${res.error}`)
+    }
+
+    if (data.exerciseSetId || data.flashcardSetId) {
+      const contentPatch: Record<string, string | null> = {}
+      if (data.exerciseSetId) contentPatch.exerciseSetId = data.exerciseSetId
+      if (data.flashcardSetId) contentPatch.flashcardSetId = data.flashcardSetId
+      await updateTrainingTopic(result.id, { contentPatch })
     }
 
     toast.success('Atividade adicionada')
