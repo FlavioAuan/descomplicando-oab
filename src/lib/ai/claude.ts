@@ -130,7 +130,8 @@ export async function callClaudeJSON<T>(
 
     return JSON.parse(clean) as T
   } catch {
-    throw new Error(`IA retornou JSON inválido: ${text.substring(0, 300)}`)
+    console.error('[callClaudeJSON] parse failed. Raw response:\n', text)
+    throw new Error(`IA retornou JSON inválido: ${text.substring(0, 500)}`)
   }
 }
 
