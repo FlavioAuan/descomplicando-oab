@@ -46,7 +46,7 @@ const adminLinks = [
   { href: '/admin/exams', icon: FileText, label: 'Provas' },
   { href: '/admin/questions', icon: HelpCircle, label: 'Questões' },
   { href: '/admin/simulations', icon: ClipboardList, label: 'Simulados' },
-  { href: '/admin/materials', icon: BookOpen, label: 'Materiais' },
+  { href: '/admin/materials', icon: BookOpen, label: 'Apostilas' },
   { href: '/admin/statistics', icon: BarChart3, label: 'Estatísticas' },
   { href: '/admin/users', icon: Users, label: 'Alunos' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações IA' },
@@ -60,7 +60,7 @@ const superAdminLinks = [
   { href: '/admin/exams', icon: FileText, label: 'Provas' },
   { href: '/admin/questions', icon: HelpCircle, label: 'Questões' },
   { href: '/admin/simulations', icon: ClipboardList, label: 'Simulados' },
-  { href: '/admin/materials', icon: BookMarked, label: 'Materiais' },
+  { href: '/admin/materials', icon: BookMarked, label: 'Apostilas' },
   { href: '/admin/users', icon: Users, label: 'Usuários' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações' },
 ]
