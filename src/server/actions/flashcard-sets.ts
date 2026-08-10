@@ -107,3 +107,22 @@ export async function getFlashcardSetWithCards(id: string): Promise<{
 
   return { set: { id: rows[0].id, title: rows[0].title }, cards: cards as FlashcardCard[] }
 }
+
+export async function updateFlashcardSetCards(
+  setId: string,
+  data: { title: string; cards: Array<{ id: string; front: string; back: string }> }
+): Promise<{ success: true } | { error: string }> {
+  await requireRole('admin', 'super_admin')
+
+  await db.update(flashcardSets).set({ title: data.title }).where(eq(flashcardSets.id, setId))
+
+  for (const card of data.cards) {
+    await db
+      .update(flashcardSetCards)
+      .set({ front: card.front, back: card.back })
+      .where(eq(flashcardSetCards.id, card.id))
+  }
+
+  revalidatePath('/admin/flashcards')
+  return { success: true }
+}
