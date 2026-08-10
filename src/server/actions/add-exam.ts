@@ -205,6 +205,7 @@ export async function saveExam(data: {
   await requireRole('admin', 'super_admin')
 
   try {
+    const now = new Date()
     const [exam] = await db.insert(exams).values({
       examNumber: data.examNumber,
       year: data.year,
@@ -212,6 +213,7 @@ export async function saveExam(data: {
       phase: '1a fase',
       totalQuestions: data.questions.length,
       isActive: true,
+      importedAt: now,
     }).returning()
 
     const CHUNK = 20
@@ -232,8 +234,10 @@ export async function saveExam(data: {
       )
     }
 
-    revalidatePath('/admin/exams')
-    revalidatePath('/admin/questions')
+    revalidatePath('/admin/exams', 'page')
+    revalidatePath('/admin/questions', 'page')
+    revalidatePath('/admin/dashboard', 'page')
+    revalidatePath('/super-admin/classify', 'page')
     return { data: { examId: exam.id, count: data.questions.length } }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Erro ao salvar prova.' }
