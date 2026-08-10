@@ -9,16 +9,24 @@ import type { AISettings, AIProvider } from '@/server/actions/settings'
 import { toast } from 'sonner'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 
-const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: string }[] = [
+const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: string; freeModels?: string[] }[] = [
   {
     id: 'openrouter',
     label: 'OpenRouter',
     hint: 'Acesse openrouter.ai para obter sua chave.',
-    defaultModel: 'openrouter/auto',
+    defaultModel: 'meta-llama/llama-3.1-8b-instruct:free',
+    freeModels: [
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'google/gemini-2.0-flash-exp:free',
+      'google/gemini-1.5-flash-8b',
+      'mistralai/mistral-7b-instruct:free',
+      'deepseek/deepseek-chat:free',
+    ],
   },
   {
     id: 'openai',
-    label: 'OpenAI (GPT-4o-mini)',
+    label: 'OpenAI',
     hint: 'Acesse platform.openai.com para obter sua chave.',
     defaultModel: 'gpt-4o-mini',
   },
@@ -131,9 +139,24 @@ export function AISettingsForm({ initialSettings }: Props) {
           required
           className="font-mono text-sm"
         />
-        <p className="text-xs text-gray-400">
-          Ex: {currentProvider.defaultModel}
-        </p>
+        {currentProvider.freeModels && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {currentProvider.freeModels.map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setModel(m)}
+                className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
+                  model === m
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <Button type="submit" disabled={saving} className="w-full">
