@@ -255,6 +255,15 @@ export class TrainingsRepository extends BaseRepository {
     return row
   }
 
+  async reorderTopics(orderedIds: string[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await this.db
+        .update(trainingTopics)
+        .set({ order: i + 1 })
+        .where(eq(trainingTopics.id, orderedIds[i]))
+    }
+  }
+
   async countAll(): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })

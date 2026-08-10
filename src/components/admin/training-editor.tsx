@@ -16,13 +16,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Loader2, Wand2, Calendar, Pencil, Trash2, Plus, Zap, Upload, X,
+  Loader2, Wand2, Calendar, Pencil, Trash2, Plus, Zap, Upload, X, GripVertical,
 } from 'lucide-react'
 import {
   generateTrainingWithAI,
   updateTrainingTopic,
   deleteTrainingTopic,
   addTrainingTopic,
+  reorderTrainingTopics,
 } from '@/server/actions/trainings'
 import {
   listStandaloneApostilas,
@@ -450,6 +451,41 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [addingTopic, setAddingTopic] = useState(false)
 
+  // Local topics state for optimistic drag-and-drop reordering
+  const [topics, setTopics] = useState(day.topics)
+  const dragSrcIdRef = useRef<string | null>(null)
+
+  // Sync when server data changes (after refresh), but not during active drag
+  const topicsKey = day.topics.map(t => `${t.id}:${t.order}`).join(',')
+  useEffect(() => { setTopics(day.topics) }, [topicsKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onDragStart(id: string) {
+    dragSrcIdRef.current = id
+  }
+
+  function onDragEnter(id: string) {
+    const srcId = dragSrcIdRef.current
+    if (!srcId || srcId === id) return
+    setTopics(prev => {
+      const next = [...prev]
+      const srcIdx = next.findIndex(t => t.id === srcId)
+      const dstIdx = next.findIndex(t => t.id === id)
+      if (srcIdx === -1 || dstIdx === -1) return prev
+      const [moved] = next.splice(srcIdx, 1)
+      next.splice(dstIdx, 0, moved)
+      return next
+    })
+  }
+
+  async function onDrop() {
+    const srcId = dragSrcIdRef.current
+    dragSrcIdRef.current = null
+    if (!srcId) return
+    const orderedIds = topics.map(t => t.id)
+    const res = await reorderTrainingTopics(day.id, orderedIds)
+    if (!res.success) { toast.error('Erro ao reordenar'); onRefresh() }
+  }
+
   async function handleUpdateTopic(topicId: string, data: TopicSaveData) {
     const contentPatch: Record<string, string | null> = {}
     if (data.exerciseSetId) contentPatch.exerciseSetId = data.exerciseSetId
@@ -480,7 +516,11 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
   async function handleDeleteTopic(topicId: string) {
     const result = await deleteTrainingTopic(topicId)
     if ('error' in result) toast.error('Erro ao excluir')
-    else { toast.success('Atividade removida'); onRefresh() }
+    else {
+      toast.success('Atividade removida')
+      setTopics(prev => prev.filter(t => t.id !== topicId))
+      onRefresh()
+    }
   }
 
   async function handleAddTopic(data: TopicSaveData) {
@@ -536,11 +576,18 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
         )}
 
         <div className="space-y-2">
-          {day.topics.map(topic => (
+          {topics.map(topic => (
             <div
               key={topic.id}
-              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group"
+              draggable
+              onDragStart={() => onDragStart(topic.id)}
+              onDragEnter={() => onDragEnter(topic.id)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={onDrop}
+              onDragEnd={() => { dragSrcIdRef.current = null }}
+              className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg group cursor-default select-none"
             >
+              <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 cursor-grab active:cursor-grabbing" />
               <span className="text-lg flex-shrink-0">{topicIcon(topic.type)}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-700 truncate">{topic.title}</p>
@@ -588,7 +635,10 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
             topic={editingTopic}
             open={true}
             onClose={() => setEditingTopic(null)}
-            onSave={data => handleUpdateTopic(editingTopic.id, data)}
+            onSave={async data => {
+              await handleUpdateTopic(editingTopic.id, data)
+              setEditingTopic(null)
+            }}
           />
         )}
         <AddTopicDialog

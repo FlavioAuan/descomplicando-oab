@@ -15,8 +15,6 @@ const createTrainingSchema = z.object({
   description: z.string().optional(),
   hoursPerDay: z.number().min(1).max(12),
   daysCount: z.number().min(7).max(365),
-  startDate: z.string(),
-  endDate: z.string(),
   targetExam: z.number().optional(),
 })
 
@@ -28,8 +26,17 @@ export async function createTraining(input: z.infer<typeof createTrainingSchema>
     return { error: validated.error.errors[0].message }
   }
 
+  // Auto-calculate dates: start today, end with enough calendar days for daysCount business days
+  const today = new Date().toISOString().slice(0, 10)
+  const calendarDays = Math.ceil(validated.data.daysCount * 7 / 5) + 14
+  const endObj = new Date(today + 'T12:00:00Z')
+  endObj.setUTCDate(endObj.getUTCDate() + calendarDays)
+  const autoEndDate = endObj.toISOString().slice(0, 10)
+
   const training = await trainingsRepository.create({
     ...validated.data,
+    startDate: today,
+    endDate: autoEndDate,
     createdBy: user.id,
   })
 
@@ -265,6 +272,13 @@ export async function updateTrainingStatus(
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Erro ao atualizar status' }
   }
+}
+
+export async function reorderTrainingTopics(dayId: string, orderedIds: string[]) {
+  await requireRole('admin', 'super_admin')
+  await trainingsRepository.reorderTopics(orderedIds)
+  revalidatePath('/admin/trainings')
+  return { success: true as const }
 }
 
 export async function getTrainingForStudent(trainingId: string) {

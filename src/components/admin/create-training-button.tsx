@@ -32,8 +32,6 @@ export function CreateTrainingButton() {
       description: (form.elements.namedItem('description') as HTMLTextAreaElement).value,
       hoursPerDay: parseFloat((form.elements.namedItem('hoursPerDay') as HTMLInputElement).value),
       daysCount: parseInt((form.elements.namedItem('daysCount') as HTMLInputElement).value),
-      startDate: (form.elements.namedItem('startDate') as HTMLInputElement).value,
-      endDate: (form.elements.namedItem('endDate') as HTMLInputElement).value,
     }
 
     const result = await createTraining(data)
@@ -98,26 +96,6 @@ export function CreateTrainingButton() {
                 min="7"
                 max="365"
                 defaultValue="60"
-                required
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Data de início</Label>
-              <Input
-                id="startDate"
-                name="startDate"
-                type="date"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endDate">Data de fim</Label>
-              <Input
-                id="endDate"
-                name="endDate"
-                type="date"
                 required
               />
             </div>
