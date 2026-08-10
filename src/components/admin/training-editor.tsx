@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  Loader2, Wand2, Calendar, Pencil, Trash2, Plus, Zap,
+  Loader2, Wand2, Calendar, Pencil, Trash2, Plus, Zap, Upload, X,
 } from 'lucide-react'
 import {
   generateTrainingWithAI,
@@ -24,6 +24,11 @@ import {
   deleteTrainingTopic,
   addTrainingTopic,
 } from '@/server/actions/trainings'
+import {
+  listStandaloneApostilas,
+  linkApostilaToTopic,
+  createApostilaForTopic,
+} from '@/server/actions/apostilas'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
@@ -73,6 +78,107 @@ interface TrainingEditorProps {
   }>
 }
 
+// ── Apostila picker (shared by both dialogs) ───────────────────────────────────
+
+type ApostilaOption = { id: string; title: string }
+
+function ApostilaPicker({
+  topicTitle,
+  onSelect,
+}: {
+  topicTitle: string
+  onSelect: (apostilaId: string | null, uploadFile: File | null) => void
+}) {
+  const [apostilas, setApostilas] = useState<ApostilaOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    listStandaloneApostilas().then(list => {
+      setApostilas(list)
+      setLoading(false)
+    })
+  }, [])
+
+  function handleSelectChange(val: string) {
+    setSelectedId(val)
+    setUploadFile(null)
+    onSelect(val || null, null)
+  }
+
+  function handleFile(file: File | null) {
+    if (!file) return
+    setUploadFile(file)
+    setSelectedId('')
+    onSelect(null, file)
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Vincular Apostila</p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Loader2 className="w-3 h-3 animate-spin" /> Carregando apostilas…
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Select value={selectedId} onValueChange={handleSelectChange}>
+            <SelectTrigger className="bg-white text-sm h-8">
+              <SelectValue placeholder="— Selecionar apostila existente —" />
+            </SelectTrigger>
+            <SelectContent>
+              {apostilas.length === 0 && (
+                <SelectItem value="__none" disabled>Nenhuma apostila disponível</SelectItem>
+              )}
+              {apostilas.map(a => (
+                <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex-1 border-t" />
+            <span>ou</span>
+            <div className="flex-1 border-t" />
+          </div>
+
+          {uploadFile ? (
+            <div className="flex items-center gap-2 bg-white rounded px-2 py-1.5 text-xs border">
+              <span className="flex-1 truncate text-gray-700">{uploadFile.name}</span>
+              <button
+                type="button"
+                onClick={() => { setUploadFile(null); onSelect(null, null) }}
+                className="text-gray-400 hover:text-red-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="w-full flex items-center justify-center gap-1.5 border border-dashed border-blue-300 rounded px-3 py-2 text-xs text-blue-600 hover:bg-blue-100 transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Fazer upload de PDF e gerar apostila
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            className="hidden"
+            onChange={e => handleFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Edit topic dialog ──────────────────────────────────────────────────────────
 
 function EditTopicDialog({
@@ -84,16 +190,24 @@ function EditTopicDialog({
   topic: Topic
   open: boolean
   onClose: () => void
-  onSave: (data: { title: string; type: string; estimatedMinutes: number }) => Promise<void>
+  onSave: (data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) => Promise<void>
 }) {
   const [title, setTitle] = useState(topic.title)
   const [type, setType] = useState(topic.type)
   const [minutes, setMinutes] = useState(topic.estimatedMinutes ?? 45)
+  const [apostilaId, setApostilaId] = useState<string | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     setSaving(true)
-    await onSave({ title, type, estimatedMinutes: minutes })
+    await onSave({
+      title,
+      type,
+      estimatedMinutes: minutes,
+      apostilaId: apostilaId ?? undefined,
+      uploadFile: uploadFile ?? undefined,
+    })
     setSaving(false)
     onClose()
   }
@@ -134,6 +248,12 @@ function EditTopicDialog({
               onChange={e => setMinutes(parseInt(e.target.value) || 30)}
             />
           </div>
+          {type === 'apostila' && (
+            <ApostilaPicker
+              topicTitle={title}
+              onSelect={(id, file) => { setApostilaId(id); setUploadFile(file) }}
+            />
+          )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -156,21 +276,31 @@ function AddTopicDialog({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (data: { title: string; type: string; estimatedMinutes: number }) => Promise<void>
+  onAdd: (data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) => Promise<void>
 }) {
   const [title, setTitle] = useState('')
   const [type, setType] = useState('apostila')
   const [minutes, setMinutes] = useState(45)
+  const [apostilaId, setApostilaId] = useState<string | null>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleAdd() {
     if (!title.trim()) return
     setSaving(true)
-    await onAdd({ title, type, estimatedMinutes: minutes })
+    await onAdd({
+      title,
+      type,
+      estimatedMinutes: minutes,
+      apostilaId: apostilaId ?? undefined,
+      uploadFile: uploadFile ?? undefined,
+    })
     setSaving(false)
     setTitle('')
     setType('apostila')
     setMinutes(45)
+    setApostilaId(null)
+    setUploadFile(null)
     onClose()
   }
 
@@ -212,6 +342,12 @@ function AddTopicDialog({
               onChange={e => setMinutes(parseInt(e.target.value) || 30)}
             />
           </div>
+          {type === 'apostila' && (
+            <ApostilaPicker
+              topicTitle={title}
+              onSelect={(id, file) => { setApostilaId(id); setUploadFile(file) }}
+            />
+          )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -233,11 +369,23 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
 
   async function handleUpdateTopic(
     topicId: string,
-    data: { title: string; type: string; estimatedMinutes: number }
+    data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }
   ) {
     const result = await updateTrainingTopic(topicId, data)
-    if ('error' in result) toast.error('Erro ao salvar')
-    else { toast.success('Atividade atualizada'); onRefresh() }
+    if ('error' in result) { toast.error('Erro ao salvar'); return }
+
+    if (data.apostilaId) {
+      await linkApostilaToTopic(data.apostilaId, topicId)
+    } else if (data.uploadFile) {
+      const fd = new FormData()
+      fd.append('title', data.title)
+      fd.append('files', data.uploadFile)
+      const res = await createApostilaForTopic(topicId, fd)
+      if ('error' in res) toast.error(`Erro ao gerar apostila: ${res.error}`)
+    }
+
+    toast.success('Atividade atualizada')
+    onRefresh()
   }
 
   async function handleDeleteTopic(topicId: string) {
@@ -246,11 +394,23 @@ function DayRow({ day, onRefresh }: { day: Day; onRefresh: () => void }) {
     else { toast.success('Atividade removida'); onRefresh() }
   }
 
-  async function handleAddTopic(data: { title: string; type: string; estimatedMinutes: number }) {
+  async function handleAddTopic(data: { title: string; type: string; estimatedMinutes: number; apostilaId?: string; uploadFile?: File }) {
     const nextOrder = (day.topics.at(-1)?.order ?? 0) + 1
     const result = await addTrainingTopic(day.id, { ...data, order: nextOrder })
-    if ('error' in result) toast.error('Erro ao adicionar')
-    else { toast.success('Atividade adicionada'); onRefresh() }
+    if ('error' in result) { toast.error('Erro ao adicionar'); return }
+
+    if (data.apostilaId) {
+      await linkApostilaToTopic(data.apostilaId, result.id)
+    } else if (data.uploadFile) {
+      const fd = new FormData()
+      fd.append('title', data.title)
+      fd.append('files', data.uploadFile)
+      const res = await createApostilaForTopic(result.id, fd)
+      if ('error' in res) toast.error(`Erro ao gerar apostila: ${res.error}`)
+    }
+
+    toast.success('Atividade adicionada')
+    onRefresh()
   }
 
   const dateStr = day.date

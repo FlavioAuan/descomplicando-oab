@@ -237,14 +237,15 @@ export class TrainingsRepository extends BaseRepository {
   async addTopic(
     dayId: string,
     data: { title: string; type: string; estimatedMinutes: number; order: number }
-  ): Promise<void> {
-    await this.db.insert(trainingTopics).values({
+  ): Promise<{ id: string }> {
+    const [row] = await this.db.insert(trainingTopics).values({
       trainingDayId: dayId,
       title: data.title,
       type: data.type as any,
       estimatedMinutes: data.estimatedMinutes,
       order: data.order,
-    })
+    }).returning({ id: trainingTopics.id })
+    return row
   }
 
   async countAll(): Promise<number> {

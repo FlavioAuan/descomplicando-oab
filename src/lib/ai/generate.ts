@@ -36,29 +36,27 @@ export async function generateApostila(params: {
   relatedJurisprudence?: string[]
   ragContext?: string
 }): Promise<ApostilaContent> {
-  const prompt = `Gere uma apostila completa para a OAB sobre:
+  const prompt = `Gere uma apostila completa e bem formatada para a OAB sobre:
 
 Disciplina: ${params.subject}
 Subtema: ${params.subtheme}
-Microtema: ${params.microtheme}
-${params.ragContext ? `\nContexto das legislações:\n${params.ragContext}` : ''}
+Tópico: ${params.microtheme}
+${params.ragContext ? `\nContexto e referências:\n${params.ragContext}` : ''}
 
-Gere em HTML semântico bem estruturado com todas as seções.
+Crie HTML semântico rico com TODAS as seções abaixo. Use APENAS estas tags HTML: h2, h3, h4, p, ul, ol, li, strong, em, blockquote, table, thead, tbody, tr, th, td, hr. NÃO use CSS inline, NÃO use classes.
 
-Responda com JSON:
-{
-  "title": "título da apostila",
-  "introduction": "<html>introdução com contexto e importância</html>",
-  "concepts": "<html>conceitos fundamentais com definições</html>",
-  "legalBasis": "<html>fundamentos legais com artigos e dispositivos</html>",
-  "relevantArticles": "<html>artigos mais cobrados na OAB</html>",
-  "jurisprudence": "<html>jurisprudência relevante com STF e STJ</html>",
-  "oabTraps": "<html>pegadinhas típicas da OAB com exemplos</html>",
-  "summary": "<html>resumo em bullet points</html>",
-  "mindMap": "<html>mapa mental em formato de lista aninhada</html>",
-  "commentedQuestions": "<html>3 questões comentadas de exames anteriores</html>",
-  "htmlContent": "<html>conteúdo completo integrado</html>"
-}`
+Seções obrigatórias:
+1. <h2>Introdução e Importância para a OAB</h2> — contexto e relevância do tema
+2. <h2>Conceitos Fundamentais</h2> — definições precisas com termos em <strong>negrito</strong>; use <h3> para subdivisões
+3. <h2>Base Legal</h2> — artigos transcritos em <blockquote>, leis e diplomas em <strong>negrito</strong>
+4. <h2>Artigos Mais Cobrados na OAB</h2> — tabela: <table><thead><tr><th>Artigo</th><th>Dispositivo</th><th>Observação</th></tr></thead><tbody>...</tbody></table>
+5. <h2>Jurisprudência Relevante</h2> — súmulas e julgados do STF/STJ em <blockquote>; número do acórdão em <strong>negrito</strong>
+6. <h2>⚠️ Pegadinhas e Armadilhas da OAB</h2> — lista <ul> com cada item: <li><strong>Erro comum:</strong> descrição. <em>Correto:</em> resposta.</li>
+7. <h2>Resumo Esquemático</h2> — bullet points <ul><li> do mais importante, estrutura hierárquica com <ul> aninhado
+8. <h2>Questões Comentadas</h2> — 3 questões objetivas: enunciado em <p>, alternativas em <ol type="A"><li>, gabarito e comentário em <p><strong>Gabarito: X</strong> — explicação</p>
+
+Responda SOMENTE com JSON (sem markdown, sem blocos de código):
+{"title":"título da apostila","htmlContent":"<h2>Introdução...</h2><p>...</p>..."}`
 
   return callClaudeJSON<ApostilaContent>(prompt, SYSTEM_APOSTILA, { maxTokens: 8192 })
 }

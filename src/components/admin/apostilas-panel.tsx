@@ -14,12 +14,52 @@ import {
 import { toast } from 'sonner'
 import {
   Upload, X, FileText, Loader2, BookOpen,
-  Trash2, Eye, Plus, Sparkles, Pencil,
+  Trash2, Eye, Plus, Sparkles, Pencil, Download,
 } from 'lucide-react'
 import { createApostila, deleteApostila, getApostilaContent, updateApostila } from '@/server/actions/apostilas'
 import type { ApostilaListItem } from '@/server/actions/apostilas'
 import { useRouter } from 'next/navigation'
 import { formatDate } from '@/lib/utils'
+
+// ─── PDF generation ───────────────────────────────────────────────────────────
+
+function openApostilaPrintWindow(title: string, html: string) {
+  const win = window.open('', '_blank')
+  if (!win) { toast.error('Permita popups para gerar o PDF'); return }
+  win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:20px;color:#111;line-height:1.75;font-size:15px}
+  h1{font-size:22px;color:#1a3a5c;border-bottom:3px solid #1a56db;padding-bottom:10px;margin-bottom:24px}
+  h2{font-size:17px;color:#1a3a5c;margin-top:36px;margin-bottom:10px;padding-left:12px;border-left:4px solid #1a56db}
+  h3{font-size:15px;color:#2d4a6e;margin-top:20px;margin-bottom:8px}
+  h4{font-size:14px;color:#2d4a6e;margin-top:16px;margin-bottom:6px}
+  p{margin:10px 0;text-align:justify}
+  ul,ol{padding-left:24px;margin:10px 0}
+  li{margin:5px 0}
+  strong{color:#1a3a5c;font-weight:700}
+  em{color:#555;font-style:italic}
+  blockquote{border-left:3px solid #93c5fd;padding:10px 16px;margin:14px 0;background:#eff6ff;color:#1e40af;border-radius:0 6px 6px 0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+  th{background:#1a3a5c;color:#fff;padding:8px 12px;text-align:left;font-weight:600}
+  td{padding:7px 12px;border:1px solid #dbeafe}
+  tr:nth-child(even) td{background:#f0f7ff}
+  hr{border:none;border-top:1px solid #e2e8f0;margin:24px 0}
+  @media print{body{margin:20px;max-width:none}}
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+${html}
+<script>window.onload=function(){window.print()}<\/script>
+</body>
+</html>`)
+  win.document.close()
+}
 
 // ─── File chip ────────────────────────────────────────────────────────────────
 
@@ -180,6 +220,7 @@ function ApostilaCard({
   onTitleChange: (newTitle: string) => void
 }) {
   const [deleting, setDeleting] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
 
   async function handleDelete() {
@@ -188,6 +229,14 @@ function ApostilaCard({
     if ('error' in res) toast.error(res.error)
     else { toast.success('Apostila excluída'); onDelete() }
     setDeleting(false)
+  }
+
+  async function handlePDF() {
+    setPdfLoading(true)
+    const content = await getApostilaContent(apostila.id)
+    setPdfLoading(false)
+    if (!content) { toast.error('Não foi possível carregar a apostila'); return }
+    openApostilaPrintWindow(content.title, content.contentHtml)
   }
 
   return (
@@ -208,6 +257,12 @@ function ApostilaCard({
         <div className="flex items-center gap-2 ml-4 flex-shrink-0">
           <Button variant="outline" size="sm" onClick={onView}>
             <Eye className="w-4 h-4 mr-1" /> Ver
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePDF} disabled={pdfLoading}>
+            {pdfLoading
+              ? <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              : <Download className="w-4 h-4 mr-1" />}
+            PDF
           </Button>
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil className="w-4 h-4 mr-1" /> Editar

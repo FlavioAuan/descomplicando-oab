@@ -183,9 +183,9 @@ export async function addTrainingTopic(
   data: { title: string; type: string; estimatedMinutes: number; order: number }
 ) {
   await requireRole('admin', 'super_admin')
-  await trainingsRepository.addTopic(dayId, data)
+  const { id } = await trainingsRepository.addTopic(dayId, data)
   revalidatePath('/admin/trainings')
-  return { success: true }
+  return { success: true as const, id }
 }
 
 export async function generateTopicApostila(topicId: string) {

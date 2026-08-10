@@ -122,6 +122,56 @@ export async function getApostilaContent(id: string): Promise<{ title: string; c
   return rows[0] ?? null
 }
 
+export async function linkApostilaToTopic(
+  apostilaId: string,
+  topicId: string
+): Promise<{ success: true } | { error: string }> {
+  await requireRole('admin', 'super_admin')
+  await db.update(apostilas).set({ trainingTopicId: topicId }).where(eq(apostilas.id, apostilaId))
+  revalidatePath('/admin/trainings')
+  return { success: true }
+}
+
+export async function createApostilaForTopic(
+  topicId: string,
+  formData: FormData
+): Promise<{ data: { id: string; title: string } } | { error: string }> {
+  await requireRole('admin', 'super_admin')
+
+  const title = (formData.get('title') as string)?.trim()
+  const files = formData.getAll('files') as File[]
+  if (!title) return { error: 'Título é obrigatório.' }
+
+  let ragContext = ''
+  for (const file of files) {
+    if (!file || file.size === 0) continue
+    try {
+      const text = await extractFileText(file)
+      ragContext += `\n\n=== ${file.name} ===\n${text.substring(0, 6000)}`
+    } catch { /* skip */ }
+  }
+
+  const content = await generateApostila({
+    subject: title,
+    subtheme: '',
+    microtheme: title,
+    ragContext: ragContext || undefined,
+  })
+
+  const [saved] = await db
+    .insert(apostilas)
+    .values({
+      title,
+      contentHtml: content.htmlContent,
+      trainingTopicId: topicId,
+      generatedBy: 'ai',
+    })
+    .returning()
+
+  revalidatePath('/admin/trainings')
+  return { data: { id: saved.id, title: saved.title } }
+}
+
 export async function listStandaloneApostilas(): Promise<ApostilaListItem[]> {
   return db
     .select({
