@@ -6,7 +6,7 @@ import { db, systemSettings } from '@/lib/db'
 import { eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
-export type AIProvider = 'openrouter' | 'openai' | 'grok'
+export type AIProvider = 'openrouter' | 'openai' | 'groq'
 
 export interface AISettings {
   provider: AIProvider
@@ -15,9 +15,9 @@ export interface AISettings {
 }
 
 const PROVIDER_DEFAULTS: Record<AIProvider, string> = {
-  openrouter: 'openrouter/auto',
+  openrouter: 'meta-llama/llama-3.1-8b-instruct:free',
   openai: 'gpt-4o-mini',
-  grok: 'grok-3-mini',
+  groq: 'llama-3.1-8b-instant',
 }
 
 export async function getAISettings(): Promise<AISettings> {
@@ -44,7 +44,7 @@ export async function getAISettings(): Promise<AISettings> {
 }
 
 const saveSchema = z.object({
-  provider: z.enum(['openrouter', 'openai', 'grok']),
+  provider: z.enum(['openrouter', 'openai', 'groq']),
   apiKey: z.string().min(1, 'Chave de API obrigatória'),
   model: z.string().min(1, 'Modelo obrigatório'),
 })

@@ -13,15 +13,22 @@ const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: st
   {
     id: 'openrouter',
     label: 'OpenRouter',
-    hint: 'Acesse openrouter.ai para obter sua chave.',
+    hint: 'Acesse openrouter.ai para obter sua chave. Use "Buscar modelos gratuitos" para ver os disponíveis.',
     defaultModel: 'meta-llama/llama-3.1-8b-instruct:free',
+  },
+  {
+    id: 'groq',
+    label: 'Groq (gratuito)',
+    hint: 'Acesse console.groq.com para obter sua chave gratuitamente.',
+    defaultModel: 'llama-3.1-8b-instant',
     freeModels: [
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'google/gemini-2.0-flash-exp:free',
-      'google/gemini-1.5-flash-8b',
-      'mistralai/mistral-7b-instruct:free',
-      'deepseek/deepseek-chat:free',
+      'llama-3.1-8b-instant',
+      'llama-3.3-70b-versatile',
+      'llama3-70b-8192',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+      'deepseek-r1-distill-llama-70b',
+      'qwen-qwq-32b',
     ],
   },
   {
@@ -29,12 +36,6 @@ const PROVIDERS: { id: AIProvider; label: string; hint: string; defaultModel: st
     label: 'OpenAI',
     hint: 'Acesse platform.openai.com para obter sua chave.',
     defaultModel: 'gpt-4o-mini',
-  },
-  {
-    id: 'grok',
-    label: 'Grok (xAI)',
-    hint: 'Acesse console.x.ai para obter sua chave.',
-    defaultModel: 'grok-3-mini',
   },
 ]
 
@@ -153,6 +154,7 @@ export function AISettingsForm({ initialSettings }: Props) {
           required
           className="font-mono text-sm"
         />
+        {/* OpenRouter: fetch real free models from API */}
         {provider === 'openrouter' && (
           <div className="space-y-2 pt-1">
             <button
@@ -187,6 +189,26 @@ export function AISettingsForm({ initialSettings }: Props) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Groq / outros: modelos fixos conhecidos */}
+        {currentProvider.freeModels && provider !== 'openrouter' && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {currentProvider.freeModels.map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setModel(m)}
+                className={`text-xs px-2 py-0.5 rounded border font-mono transition-colors ${
+                  model === m
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         )}
       </div>

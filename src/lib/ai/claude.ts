@@ -1,11 +1,11 @@
-// AI client — supports OpenRouter, OpenAI and xAI (Grok) via OpenAI-compatible API
+// AI client — supports OpenRouter, OpenAI and Groq via OpenAI-compatible API
 
 import type { AIProvider } from '@/server/actions/settings'
 
 const BASE_URLS: Record<AIProvider, string> = {
   openrouter: 'https://openrouter.ai/api/v1',
   openai: 'https://api.openai.com/v1',
-  grok: 'https://api.x.ai/v1',
+  groq: 'https://api.groq.com/openai/v1',
 }
 
 // ─── Settings cache (avoids DB hit on every AI call) ─────────────────────────
