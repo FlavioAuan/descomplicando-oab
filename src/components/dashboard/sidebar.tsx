@@ -54,7 +54,7 @@ const adminLinks = [
 
 const superAdminLinks = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/super-admin/classify', icon: Zap, label: 'Classificação IA' },
+  { href: '/super-admin/classify', icon: FileText, label: 'Incluir Prova' },
   { href: '/super-admin/predictions', icon: Brain, label: 'Previsões' },
   { href: '/admin/trainings', icon: GraduationCap, label: 'Treinamentos' },
   { href: '/admin/exams', icon: FileText, label: 'Provas' },

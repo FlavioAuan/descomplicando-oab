@@ -1,32 +1,23 @@
 import { Metadata } from 'next'
 import { requireRole } from '@/server/actions/auth'
-import { ClassifyPanel } from '@/components/super-admin/classify-panel'
-import { questionsRepository } from '@/server/repositories/questions'
+import { AddExamPanel } from '@/components/super-admin/add-exam-panel'
 
-export const metadata: Metadata = { title: 'Classificação IA' }
+export const metadata: Metadata = { title: 'Incluir Nova Prova' }
 
-export default async function ClassifyPage() {
-  await requireRole('super_admin')
-
-  const [total, classified] = await Promise.all([
-    questionsRepository.countTotal(),
-    questionsRepository.countClassified(),
-  ])
+export default async function AddExamPage() {
+  await requireRole('admin', 'super_admin')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Classificação com IA</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Incluir Nova Prova</h1>
         <p className="text-gray-500 mt-1">
-          Utilize o Claude para classificar questões por disciplina, subtema e microtema
+          Faça upload do PDF da prova e do gabarito. O sistema extrai as questões automaticamente
+          e permite classificá-las por disciplina usando a IA configurada.
         </p>
       </div>
 
-      <ClassifyPanel
-        total={total}
-        classified={classified}
-        unclassified={total - classified}
-      />
+      <AddExamPanel />
     </div>
   )
 }
