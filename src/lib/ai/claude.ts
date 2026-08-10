@@ -99,9 +99,22 @@ export async function callClaude(
   const choice = data.choices?.[0]
   const msg = choice?.message
 
-  // Prefer content; thinking models (DeepSeek) expose output via reasoning or reasoning_content
+  // Gemini via OpenRouter may return content as an array of parts instead of a plain string
+  let rawContent: string
+  if (typeof msg?.content === 'string') {
+    rawContent = msg.content
+  } else if (Array.isArray(msg?.content)) {
+    rawContent = (msg.content as Array<{ type: string; text?: string }>)
+      .filter(p => p.type === 'text')
+      .map(p => p.text ?? '')
+      .join('')
+  } else {
+    rawContent = ''
+  }
+
+  // Thinking models expose output via reasoning_content / reasoning when content is empty
   const content =
-    (msg?.content as string | null) ||
+    rawContent ||
     (msg?.reasoning_content as string | null) ||
     (msg?.reasoning as string | null) ||
     ''
@@ -109,9 +122,8 @@ export async function callClaude(
   if (!content) {
     const reason = choice?.finish_reason ?? 'unknown'
     const usedModel = data.model ?? model
-    // finish_reason=length + thinking model = all tokens consumed by reasoning, no output produced
     const hint = reason === 'length'
-      ? 'O modelo esgotou os tokens durante o raciocínio interno (thinking model). Use google/gemini-flash-1.5 em Configurações IA.'
+      ? 'O modelo esgotou os tokens durante o raciocínio interno. Use google/gemini-flash-1.5 em Configurações IA.'
       : 'Acesse Configurações IA e troque o modelo para google/gemini-flash-1.5'
     console.error('[callClaude] empty content:', usedModel, 'finish_reason:', reason)
     throw new Error(`Modelo ${usedModel} retornou resposta vazia. ${hint}`)
@@ -129,6 +141,16 @@ export async function callClaudeJSON<T>(
 ): Promise<T> {
   const sys = `${systemPrompt ?? ''}\n\nResponda SEMPRE em JSON válido, sem markdown, sem explicações adicionais.`.trim()
   const text = await callClaude(prompt, sys, options)
+
+  // Quick sanity check: if there's no JSON structure at all, give an actionable error
+  if (!text.includes('{') && !text.includes('[')) {
+    console.error('[callClaudeJSON] no JSON in response:', text)
+    throw new Error(
+      `O modelo não retornou JSON. Isso ocorre com modelos gratuitos (ex: openrouter/free) que ativam filtros de segurança. ` +
+      `Acesse Configurações IA e troque para "google/gemini-flash-1.5" ou outro modelo pago. ` +
+      `Resposta recebida: "${text.substring(0, 120)}"`
+    )
+  }
 
   try {
     let clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -152,7 +174,10 @@ export async function callClaudeJSON<T>(
     return JSON.parse(clean) as T
   } catch {
     console.error('[callClaudeJSON] parse failed. Raw response:\n', text)
-    throw new Error(`IA retornou JSON inválido: ${text.substring(0, 500)}`)
+    throw new Error(
+      `IA retornou JSON inválido. Tente trocar o modelo em Configurações IA. ` +
+      `Resposta: ${text.substring(0, 300)}`
+    )
   }
 }
 
