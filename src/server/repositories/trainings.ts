@@ -197,6 +197,50 @@ export class TrainingsRepository extends BaseRepository {
     }
   }
 
+  async clearDays(trainingId: string): Promise<void> {
+    // trainingTopics cascade-delete when trainingDay is deleted
+    const days = await this.db
+      .select({ id: trainingDays.id })
+      .from(trainingDays)
+      .where(eq(trainingDays.trainingId, trainingId))
+
+    for (const day of days) {
+      await this.db.delete(trainingTopics).where(eq(trainingTopics.trainingDayId, day.id))
+    }
+    await this.db.delete(trainingDays).where(eq(trainingDays.trainingId, trainingId))
+  }
+
+  async updateTopic(
+    topicId: string,
+    data: { title?: string; type?: string; estimatedMinutes?: number }
+  ): Promise<void> {
+    await this.db
+      .update(trainingTopics)
+      .set({
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.type !== undefined && { type: data.type as any }),
+        ...(data.estimatedMinutes !== undefined && { estimatedMinutes: data.estimatedMinutes }),
+      })
+      .where(eq(trainingTopics.id, topicId))
+  }
+
+  async deleteTopic(topicId: string): Promise<void> {
+    await this.db.delete(trainingTopics).where(eq(trainingTopics.id, topicId))
+  }
+
+  async addTopic(
+    dayId: string,
+    data: { title: string; type: string; estimatedMinutes: number; order: number }
+  ): Promise<void> {
+    await this.db.insert(trainingTopics).values({
+      trainingDayId: dayId,
+      title: data.title,
+      type: data.type as any,
+      estimatedMinutes: data.estimatedMinutes,
+      order: data.order,
+    })
+  }
+
   async countAll(): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)::int` })

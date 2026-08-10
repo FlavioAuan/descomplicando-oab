@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireRole, requireUser } from './auth'
 import { trainingsRepository } from '../repositories/trainings'
-import { generateTrainingPlan, generateApostila, generateFlashcards, generateQuestions } from '@/lib/ai/generate'
+import { generateTrainingPlanBatch, generateApostila, generateFlashcards, generateQuestions } from '@/lib/ai/generate'
 import { getTopicFrequency, calculateSubjectStatistics } from '../services/statistics'
 import { db, subjects, subsubjects, microtopics, apostilas, flashcards, aiGenerations } from '@/lib/db'
 import { eq } from 'drizzle-orm'
@@ -37,6 +37,23 @@ export async function createTraining(input: z.infer<typeof createTrainingSchema>
   return { data: training }
 }
 
+// Returns all Mon–Fri dates between startDate and endDate (inclusive)
+function getBusinessDays(startDate: string, endDate: string): string[] {
+  const days: string[] = []
+  const current = new Date(startDate + 'T12:00:00Z')
+  const end = new Date(endDate + 'T12:00:00Z')
+  while (current <= end) {
+    const dow = current.getUTCDay()
+    if (dow !== 0 && dow !== 6) {
+      days.push(current.toISOString().slice(0, 10))
+    }
+    current.setUTCDate(current.getUTCDate() + 1)
+  }
+  return days
+}
+
+const BATCH_SIZE = 7 // days per AI call — keeps output tokens ≤ 3500
+
 export async function generateTrainingWithAI(trainingId: string) {
   const user = await requireRole('admin', 'super_admin')
 
@@ -46,6 +63,9 @@ export async function generateTrainingWithAI(trainingId: string) {
   const startTime = Date.now()
 
   try {
+    // Clear any previously generated days
+    await trainingsRepository.clearDays(trainingId)
+
     const [subjectStats, topicFrequency] = await Promise.all([
       calculateSubjectStatistics(),
       getTopicFrequency(),
@@ -63,34 +83,47 @@ export async function generateTrainingWithAI(trainingId: string) {
         probability: t.frequencyHistorical,
       }))
 
-    const plan = await generateTrainingPlan({
-      name: training.name,
-      description: training.description || '',
-      hoursPerDay: training.hoursPerDay,
-      daysCount: training.daysCount,
-      startDate: training.startDate,
-      topSubjects,
-      predictions,
-    })
+    // Calculate business days for the full training period
+    const businessDays = getBusinessDays(training.startDate, training.endDate)
+    const totalBusinessDays = businessDays.length
 
-    // Resolve subject IDs for the generated topics
+    // Resolve subject IDs once
     const allSubjects = await db.select().from(subjects)
     const allSubsubjects = await db.select().from(subsubjects)
     const subjectMap = new Map(allSubjects.map(s => [s.name.toLowerCase(), s.id]))
     const subsubjectMap = new Map(allSubsubjects.map(s => [s.name.toLowerCase(), s.id]))
 
-    const daysWithIds = plan.days.map(day => ({
-      ...day,
-      topics: day.topics.map(topic => ({
-        ...topic,
-        subjectId: subjectMap.get(topic.subject?.toLowerCase() || '') || undefined,
-        subsubjectId: subsubjectMap.get(topic.subtheme?.toLowerCase() || '') || undefined,
-      })),
-    }))
+    // Generate in batches of BATCH_SIZE days
+    for (let i = 0; i < businessDays.length; i += BATCH_SIZE) {
+      const batchDates = businessDays.slice(i, i + BATCH_SIZE)
+      const startDayNumber = i + 1
 
-    await trainingsRepository.insertDaysAndTopics(trainingId, daysWithIds)
+      const batchDays = await generateTrainingPlanBatch({
+        name: training.name,
+        hoursPerDay: training.hoursPerDay,
+        batchDates,
+        startDayNumber,
+        totalBusinessDays,
+        topSubjects,
+        predictions,
+        isFirst: i === 0,
+      })
 
-    // Save AI generation log
+      // Ensure dayNumbers are sequential even if AI returns them off
+      const correctedDays = batchDays.map((day, idx) => ({
+        ...day,
+        dayNumber: startDayNumber + idx,
+        date: batchDates[idx] || day.date,
+        topics: day.topics.map(topic => ({
+          ...topic,
+          subjectId: subjectMap.get(topic.subject?.toLowerCase() || '') || undefined,
+          subsubjectId: subsubjectMap.get(topic.subtheme?.toLowerCase() || '') || undefined,
+        })),
+      }))
+
+      await trainingsRepository.insertDaysAndTopics(trainingId, correctedDays)
+    }
+
     await db.insert(aiGenerations).values({
       type: 'training_plan',
       entityId: trainingId,
@@ -102,7 +135,7 @@ export async function generateTrainingWithAI(trainingId: string) {
     })
 
     revalidatePath(`/admin/trainings/${trainingId}`)
-    return { data: { summary: plan.summary, strategy: plan.studyStrategy } }
+    return { data: { totalDays: totalBusinessDays } }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
@@ -119,6 +152,33 @@ export async function generateTrainingWithAI(trainingId: string) {
 
     return { error: `Falha ao gerar plano de treinamento: ${errorMessage}` }
   }
+}
+
+export async function updateTrainingTopic(
+  topicId: string,
+  data: { title?: string; type?: string; estimatedMinutes?: number }
+) {
+  await requireRole('admin', 'super_admin')
+  await trainingsRepository.updateTopic(topicId, data)
+  revalidatePath('/admin/trainings')
+  return { success: true }
+}
+
+export async function deleteTrainingTopic(topicId: string) {
+  await requireRole('admin', 'super_admin')
+  await trainingsRepository.deleteTopic(topicId)
+  revalidatePath('/admin/trainings')
+  return { success: true }
+}
+
+export async function addTrainingTopic(
+  dayId: string,
+  data: { title: string; type: string; estimatedMinutes: number; order: number }
+) {
+  await requireRole('admin', 'super_admin')
+  await trainingsRepository.addTopic(dayId, data)
+  revalidatePath('/admin/trainings')
+  return { success: true }
 }
 
 export async function generateTopicApostila(topicId: string) {

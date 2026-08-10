@@ -127,18 +127,56 @@ Responda com JSON array:
   return callClaudeJSON<GeneratedQuestion[]>(prompt, SYSTEM_QUESTIONS, { maxTokens: 6144 })
 }
 
-export async function generateTrainingPlan(params: {
+// Generates a single batch of up to BATCH_SIZE business days.
+// Called multiple times by generateTrainingWithAI for long plans.
+export async function generateTrainingPlanBatch(params: {
   name: string
-  description: string
   hoursPerDay: number
-  daysCount: number
-  startDate: string
+  batchDates: string[]        // ISO date strings for each day in this batch
+  startDayNumber: number      // dayNumber of the first date in the batch
+  totalBusinessDays: number
   topSubjects: Array<{ name: string; weight: number }>
   predictions: Array<{ topic: string; probability: number }>
-  ragContext?: string
-}): Promise<{
-  days: Array<{
+  isFirst: boolean
+}): Promise<Array<{
+  dayNumber: number
+  date: string
+  title: string
+  description: string
+  estimatedHours: number
+  topics: Array<{
+    order: number
+    title: string
+    type: string
+    subject: string
+    subtheme: string
+    microtheme: string
+    estimatedMinutes: number
+  }>
+}>> {
+  const topicsPerDay = Math.max(2, Math.min(4, Math.floor(params.hoursPerDay * 60 / 45)))
+  const batchSize = params.batchDates.length
+  const endDayNumber = params.startDayNumber + batchSize - 1
+  const isRevisionBatch = !params.isFirst // não incluir summary/strategy em lotes subsequentes
+
+  const prompt = `Plano OAB "${params.name}" — dias úteis ${params.startDayNumber} a ${endDayNumber} de ${params.totalBusinessDays}.
+Horas/dia: ${params.hoursPerDay}h | ${topicsPerDay} tópicos/dia
+
+Datas deste lote: ${params.batchDates.join(', ')}
+Dia inicial: ${params.startDayNumber}${isRevisionBatch ? ' (continuação, sem revisar temas já cobertos nos lotes anteriores)' : ''}
+
+Top disciplinas: ${params.topSubjects.slice(0, 6).map(s => `${s.name}(${(s.weight * 100).toFixed(0)}%)`).join(', ')}
+Temas quentes: ${params.predictions.slice(0, 8).map(p => p.topic).join(', ')}
+
+Regras: distribua por peso, progressão fácil→difícil, revisão+simulado a cada 7 dias.
+Tipos: apostila, flashcard, exercise, simulation, review
+
+Responda SOMENTE JSON (sem markdown):
+[{"dayNumber":${params.startDayNumber},"date":"${params.batchDates[0]}","title":"título","description":"desc","estimatedHours":${params.hoursPerDay},"topics":[{"order":1,"title":"Título","type":"apostila","subject":"Disciplina","subtheme":"Subtema","microtheme":"Microtema","estimatedMinutes":60}]}]`
+
+  const result = await callClaudeJSON<Array<{
     dayNumber: number
+    date: string
     title: string
     description: string
     estimatedHours: number
@@ -151,59 +189,9 @@ export async function generateTrainingPlan(params: {
       microtheme: string
       estimatedMinutes: number
     }>
-  }>
-  summary: string
-  studyStrategy: string
-}> {
-  // Limit to 14 days per AI call to stay within free-model token limits.
-  // For longer plans the admin can regenerate or extend manually.
-  const daysToGenerate = Math.min(params.daysCount, 14)
-  const topicsPerDay = Math.max(2, Math.min(4, Math.floor(params.hoursPerDay * 60 / 45)))
+  }>>(prompt, SYSTEM_TRAINING, { maxTokens: 3500 })
 
-  const prompt = `Crie um plano de treinamento OAB para os primeiros ${daysToGenerate} dias (de ${params.daysCount} no total).
-
-Nome: ${params.name}
-Horas por dia: ${params.hoursPerDay}h
-Tópicos por dia: ${topicsPerDay}
-
-Disciplinas prioritárias (top 8 por peso histórico):
-${params.topSubjects.slice(0, 8).map(s => `- ${s.name}: ${(s.weight * 100).toFixed(1)}%`).join('\n')}
-
-Temas mais prováveis para a próxima OAB (top 10):
-${params.predictions.slice(0, 10).map(p => `- ${p.topic}: ${(p.probability * 100).toFixed(0)}%`).join('\n')}
-
-Regras:
-1. Distribua disciplinas conforme o peso histórico
-2. Progressão fácil → difícil ao longo dos dias
-3. Inclua revisão e simulado a cada 7 dias
-4. Tipos disponíveis: apostila, flashcard, exercise, simulation, review
-
-Responda SOMENTE com JSON válido (sem markdown):
-{
-  "days": [
-    {
-      "dayNumber": 1,
-      "title": "título curto",
-      "description": "descrição breve",
-      "estimatedHours": ${params.hoursPerDay},
-      "topics": [
-        {
-          "order": 1,
-          "title": "título do tópico",
-          "type": "apostila",
-          "subject": "Disciplina",
-          "subtheme": "Subtema",
-          "microtheme": "Microtema",
-          "estimatedMinutes": 60
-        }
-      ]
-    }
-  ],
-  "summary": "resumo da estratégia em 2-3 frases",
-  "studyStrategy": "explicação da abordagem pedagógica"
-}`
-
-  return callClaudeJSON(prompt, SYSTEM_TRAINING, { maxTokens: 8192 })
+  return Array.isArray(result) ? result : []
 }
 
 export async function generatePredictions(params: {
