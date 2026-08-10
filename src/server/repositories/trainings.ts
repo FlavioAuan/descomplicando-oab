@@ -197,6 +197,12 @@ export class TrainingsRepository extends BaseRepository {
     }
   }
 
+  async delete(id: string): Promise<void> {
+    // Days → Topics cascade via clearDays, then delete the training itself
+    await this.clearDays(id)
+    await this.db.delete(trainings).where(eq(trainings.id, id))
+  }
+
   async clearDays(trainingId: string): Promise<void> {
     // trainingTopics cascade-delete when trainingDay is deleted
     const days = await this.db

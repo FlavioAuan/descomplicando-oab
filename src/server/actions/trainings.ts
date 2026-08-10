@@ -154,6 +154,13 @@ export async function generateTrainingWithAI(trainingId: string) {
   }
 }
 
+export async function deleteTraining(trainingId: string) {
+  await requireRole('admin', 'super_admin')
+  await trainingsRepository.delete(trainingId)
+  revalidatePath('/admin/trainings')
+  return { success: true }
+}
+
 export async function updateTrainingTopic(
   topicId: string,
   data: { title?: string; type?: string; estimatedMinutes?: number }
