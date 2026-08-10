@@ -75,6 +75,10 @@ export async function saveAISettings(
     upsert('ai_model', model),
   ])
 
+  // Bust the in-memory cache so the next AI call picks up the new settings immediately
+  const { bustAISettingsCache } = await import('@/lib/ai/claude')
+  bustAISettingsCache()
+
   revalidatePath('/super-admin/settings')
   revalidatePath('/admin/settings')
   return { success: true }

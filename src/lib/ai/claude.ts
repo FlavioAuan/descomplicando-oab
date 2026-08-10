@@ -99,20 +99,22 @@ export async function callClaude(
   const choice = data.choices?.[0]
   const msg = choice?.message
 
-  // Some "thinking" models put output in reasoning_content instead of content
+  // Prefer content; thinking models (DeepSeek) expose output via reasoning or reasoning_content
   const content =
     (msg?.content as string | null) ||
     (msg?.reasoning_content as string | null) ||
+    (msg?.reasoning as string | null) ||
     ''
 
   if (!content) {
-    console.error('[callClaude] empty content. Full response:', JSON.stringify(data, null, 2))
     const reason = choice?.finish_reason ?? 'unknown'
     const usedModel = data.model ?? model
-    throw new Error(
-      `Modelo ${usedModel} retornou resposta vazia (finish_reason: ${reason}). ` +
-      `Acesse Configurações IA e troque para google/gemini-flash-1.5`
-    )
+    // finish_reason=length + thinking model = all tokens consumed by reasoning, no output produced
+    const hint = reason === 'length'
+      ? 'O modelo esgotou os tokens durante o raciocínio interno (thinking model). Use google/gemini-flash-1.5 em Configurações IA.'
+      : 'Acesse Configurações IA e troque o modelo para google/gemini-flash-1.5'
+    console.error('[callClaude] empty content:', usedModel, 'finish_reason:', reason)
+    throw new Error(`Modelo ${usedModel} retornou resposta vazia. ${hint}`)
   }
 
   return content
