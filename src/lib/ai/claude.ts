@@ -110,10 +110,27 @@ export async function callClaudeJSON<T>(
   const text = await callClaude(prompt, sys, options)
 
   try {
-    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    let clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+    // Find the first JSON structure in case the model prepended text
+    const firstBracket = clean.indexOf('[')
+    const firstBrace = clean.indexOf('{')
+    const start =
+      firstBracket === -1 ? firstBrace
+      : firstBrace === -1 ? firstBracket
+      : Math.min(firstBracket, firstBrace)
+
+    if (start > 0) clean = clean.slice(start)
+
+    // Trim anything after the closing bracket/brace
+    const lastBracket = clean.lastIndexOf(']')
+    const lastBrace = clean.lastIndexOf('}')
+    const end = Math.max(lastBracket, lastBrace)
+    if (end !== -1 && end < clean.length - 1) clean = clean.slice(0, end + 1)
+
     return JSON.parse(clean) as T
   } catch {
-    throw new Error(`IA retornou JSON inválido: ${text.substring(0, 200)}`)
+    throw new Error(`IA retornou JSON inválido: ${text.substring(0, 300)}`)
   }
 }
 
