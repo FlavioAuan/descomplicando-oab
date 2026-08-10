@@ -145,16 +145,23 @@ function EditApostilaDialog({
   const htmlRef = useRef('')
   const loadedRef = useRef(false)
 
-  // Load content on open — useEffect is reliable; onOpenChange is not for controlled opens
+  // Load content on open. Editor div is always mounted (never inside a conditional),
+  // so editorRef.current is guaranteed to exist when the fetch resolves.
   useEffect(() => {
-    if (!open || loadedRef.current) return
+    if (!open) {
+      // Reset so re-opening always fetches fresh content
+      loadedRef.current = false
+      htmlRef.current = ''
+      if (editorRef.current) editorRef.current.innerHTML = ''
+      return
+    }
+    if (loadedRef.current) return
     loadedRef.current = true
     setLoading(true)
     getApostilaContent(apostila.id).then(content => {
       if (content) {
         setEditTitle(content.title)
         htmlRef.current = content.contentHtml
-        // Set contenteditable innerHTML directly (no React state to avoid re-render fights)
         if (editorRef.current) {
           editorRef.current.innerHTML = content.contentHtml
         }
@@ -162,14 +169,6 @@ function EditApostilaDialog({
       setLoading(false)
     })
   }, [open, apostila.id])
-
-  // Reset on close so re-opening fetches again
-  useEffect(() => {
-    if (!open) {
-      loadedRef.current = false
-      htmlRef.current = ''
-    }
-  }, [open])
 
   const exec = useCallback((cmd: string, value?: string) => {
     document.execCommand(cmd, false, value ?? undefined)
@@ -219,115 +218,116 @@ function EditApostilaDialog({
           <DialogTitle className="text-base">Editar Apostila</DialogTitle>
         </DialogHeader>
 
-        {loading ? (
+        {/* Everything stays mounted so editorRef is always available when content loads */}
+        <div className="flex flex-col flex-1 overflow-hidden p-6 gap-4" style={{ display: loading ? 'none' : 'flex' }}>
+          {/* Title */}
+          <div className="space-y-1 flex-shrink-0">
+            <Label htmlFor="editTitle" className="text-sm font-medium">Título</Label>
+            <Input
+              id="editTitle"
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+            />
+          </div>
+
+          {/* Toolbar + mode toggle */}
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            {mode === 'visual' && (
+              <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-1 flex-wrap">
+                <ToolbarBtn onClick={() => exec('bold')} title="Negrito (Ctrl+B)">
+                  <Bold className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => exec('italic')} title="Itálico (Ctrl+I)">
+                  <Italic className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+                <ToolbarBtn onClick={() => exec('formatBlock', 'h2')} title="Título H2">
+                  <Heading2 className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => exec('formatBlock', 'h3')} title="Subtítulo H3">
+                  <Heading3 className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => exec('formatBlock', 'p')} title="Parágrafo normal">
+                  <AlignLeft className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+                <ToolbarBtn onClick={() => exec('insertUnorderedList')} title="Lista com marcadores">
+                  <List className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => exec('insertOrderedList')} title="Lista numerada">
+                  <ListOrdered className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+                <ToolbarBtn onClick={() => exec('undo')} title="Desfazer">
+                  <Undo2 className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => exec('redo')} title="Refazer">
+                  <Redo2 className="w-3.5 h-3.5" />
+                </ToolbarBtn>
+              </div>
+            )}
+
+            <div className="ml-auto flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
+              <button
+                type="button"
+                onClick={switchToVisual}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                  mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <AlignLeft className="w-3 h-3" /> Visual
+              </button>
+              <button
+                type="button"
+                onClick={switchToHtml}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                  mode === 'html' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Code2 className="w-3 h-3" /> HTML
+              </button>
+            </div>
+          </div>
+
+          {/* Editor area */}
+          <div className="flex-1 overflow-hidden rounded-lg border min-h-0 relative">
+            <style dangerouslySetInnerHTML={{ __html: APOSTILA_CSS }} />
+
+            {/* Visual WYSIWYG — always in DOM so ref is available when content loads */}
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              className="apostila-body w-full h-full overflow-y-auto p-6 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200"
+              style={{ display: mode === 'visual' ? 'block' : 'none', minHeight: '420px' }}
+            />
+
+            {/* HTML source */}
+            {mode === 'html' && (
+              <textarea
+                defaultValue={htmlRef.current}
+                onChange={e => { htmlRef.current = e.target.value }}
+                className="w-full h-full resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
+                spellCheck={false}
+                style={{ minHeight: '420px' }}
+              />
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 flex-shrink-0">
+            <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Salvar alterações
+            </Button>
+          </div>
+        </div>
+
+        {/* Loading overlay — separate from editor so editor stays mounted */}
+        {loading && (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-          </div>
-        ) : (
-          <div className="flex flex-col flex-1 overflow-hidden p-6 gap-4">
-            {/* Title */}
-            <div className="space-y-1 flex-shrink-0">
-              <Label htmlFor="editTitle" className="text-sm font-medium">Título</Label>
-              <Input
-                id="editTitle"
-                value={editTitle}
-                onChange={e => setEditTitle(e.target.value)}
-              />
-            </div>
-
-            {/* Toolbar + mode toggle */}
-            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-              {mode === 'visual' && (
-                <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-1 flex-wrap">
-                  <ToolbarBtn onClick={() => exec('bold')} title="Negrito (Ctrl+B)">
-                    <Bold className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <ToolbarBtn onClick={() => exec('italic')} title="Itálico (Ctrl+I)">
-                    <Italic className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <div className="w-px h-5 bg-gray-300 mx-1" />
-                  <ToolbarBtn onClick={() => exec('formatBlock', 'h2')} title="Título H2">
-                    <Heading2 className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <ToolbarBtn onClick={() => exec('formatBlock', 'h3')} title="Subtítulo H3">
-                    <Heading3 className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <ToolbarBtn onClick={() => exec('formatBlock', 'p')} title="Parágrafo normal">
-                    <AlignLeft className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <div className="w-px h-5 bg-gray-300 mx-1" />
-                  <ToolbarBtn onClick={() => exec('insertUnorderedList')} title="Lista com marcadores">
-                    <List className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <ToolbarBtn onClick={() => exec('insertOrderedList')} title="Lista numerada">
-                    <ListOrdered className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <div className="w-px h-5 bg-gray-300 mx-1" />
-                  <ToolbarBtn onClick={() => exec('undo')} title="Desfazer">
-                    <Undo2 className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                  <ToolbarBtn onClick={() => exec('redo')} title="Refazer">
-                    <Redo2 className="w-3.5 h-3.5" />
-                  </ToolbarBtn>
-                </div>
-              )}
-
-              <div className="ml-auto flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={switchToVisual}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-                    mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <AlignLeft className="w-3 h-3" /> Visual
-                </button>
-                <button
-                  type="button"
-                  onClick={switchToHtml}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-                    mode === 'html' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <Code2 className="w-3 h-3" /> HTML
-                </button>
-              </div>
-            </div>
-
-            {/* Editor area */}
-            <div className="flex-1 overflow-hidden rounded-lg border min-h-0 relative">
-              {/* Shared apostila styles injected once */}
-              <style dangerouslySetInnerHTML={{ __html: APOSTILA_CSS }} />
-
-              {/* Visual WYSIWYG editor — kept in DOM so ref + undo history survive mode switch */}
-              <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                className="apostila-body w-full overflow-y-auto p-6 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200"
-                style={{ display: mode === 'visual' ? 'block' : 'none', minHeight: '420px', maxHeight: '100%' }}
-              />
-
-              {/* HTML source textarea */}
-              {mode === 'html' && (
-                <textarea
-                  defaultValue={htmlRef.current}
-                  onChange={e => { htmlRef.current = e.target.value }}
-                  className="w-full h-full resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
-                  spellCheck={false}
-                  style={{ minHeight: '420px' }}
-                />
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2 flex-shrink-0">
-              <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Salvar alterações
-              </Button>
-            </div>
           </div>
         )}
       </DialogContent>
