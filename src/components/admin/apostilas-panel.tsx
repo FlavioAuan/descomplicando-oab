@@ -289,17 +289,17 @@ function EditApostilaDialog({
             </div>
           </div>
 
-          {/* Editor area */}
-          <div className="flex-1 overflow-hidden rounded-lg border min-h-0 relative">
+          {/* Editor area — relative container so absolute children fill it exactly */}
+          <div className="flex-1 min-h-0 rounded-lg border relative" style={{ minHeight: '420px' }}>
             <style dangerouslySetInnerHTML={{ __html: APOSTILA_CSS }} />
 
-            {/* Visual WYSIWYG — always in DOM so ref is available when content loads */}
+            {/* Visual WYSIWYG — absolute inset-0 gives it a concrete height so overflow-y-auto scrolls */}
             <div
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              className="apostila-body w-full h-full overflow-y-auto p-6 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200"
-              style={{ display: mode === 'visual' ? 'block' : 'none', minHeight: '420px' }}
+              className="apostila-body absolute inset-0 overflow-y-auto p-6 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200"
+              style={{ display: mode === 'visual' ? 'block' : 'none' }}
             />
 
             {/* HTML source */}
@@ -307,9 +307,8 @@ function EditApostilaDialog({
               <textarea
                 defaultValue={htmlRef.current}
                 onChange={e => { htmlRef.current = e.target.value }}
-                className="w-full h-full resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
+                className="absolute inset-0 resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
                 spellCheck={false}
-                style={{ minHeight: '420px' }}
               />
             )}
           </div>
