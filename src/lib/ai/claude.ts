@@ -1,21 +1,69 @@
-// AI client — powered by OpenRouter (Free Models Router)
-// https://openrouter.ai/openrouter/free
+// AI client — supports OpenRouter, OpenAI and xAI (Grok) via OpenAI-compatible API
 
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
+import type { AIProvider } from '@/server/actions/settings'
 
-function getHeaders(): Record<string, string> {
-  const apiKey = process.env.OPENROUTER_API_KEY
-  if (!apiKey) throw new Error('OPENROUTER_API_KEY env var is not set')
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-    'HTTP-Referer': 'https://descomplicandoab.vercel.app',
-    'X-Title': 'DescomplicandOAB',
-  }
+const BASE_URLS: Record<AIProvider, string> = {
+  openrouter: 'https://openrouter.ai/api/v1',
+  openai: 'https://api.openai.com/v1',
+  grok: 'https://api.x.ai/v1',
 }
 
-function getModel(): string {
-  return process.env.OPENROUTER_MODEL ?? 'openrouter/auto'
+// ─── Settings cache (avoids DB hit on every AI call) ─────────────────────────
+
+interface CachedSettings {
+  provider: AIProvider
+  apiKey: string
+  model: string
+  baseUrl: string
+  expiresAt: number
+}
+
+let _cache: CachedSettings | null = null
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+export function bustAISettingsCache() {
+  _cache = null
+}
+
+async function loadSettings(): Promise<CachedSettings> {
+  if (_cache && Date.now() < _cache.expiresAt) return _cache
+
+  try {
+    const { getAISettings } = await import('@/server/actions/settings')
+    const s = await getAISettings()
+    _cache = {
+      provider: s.provider,
+      apiKey: s.apiKey,
+      model: s.model,
+      baseUrl: BASE_URLS[s.provider],
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    }
+  } catch {
+    // Fall back to env vars if DB is unavailable
+    const provider: AIProvider = 'openrouter'
+    _cache = {
+      provider,
+      apiKey: process.env.OPENROUTER_API_KEY ?? '',
+      model: process.env.OPENROUTER_MODEL ?? 'openrouter/auto',
+      baseUrl: BASE_URLS[provider],
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    }
+  }
+
+  if (!_cache.apiKey) throw new Error('Nenhuma chave de API configurada. Acesse Configurações IA.')
+  return _cache
+}
+
+function buildHeaders(apiKey: string, provider: AIProvider): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }
+  if (provider === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://descomplicandoab.vercel.app'
+    headers['X-Title'] = 'DescomplicandOAB'
+  }
+  return headers
 }
 
 // ─── Non-streaming ────────────────────────────────────────────────────────────
@@ -25,15 +73,17 @@ export async function callClaude(
   systemPrompt?: string,
   options?: { maxTokens?: number; temperature?: number }
 ): Promise<string> {
+  const { baseUrl, apiKey, model, provider } = await loadSettings()
+
   const messages: { role: string; content: string }[] = []
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
   messages.push({ role: 'user', content: prompt })
 
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: buildHeaders(apiKey, provider),
     body: JSON.stringify({
-      model: getModel(),
+      model,
       messages,
       max_tokens: options?.maxTokens ?? 4096,
       temperature: options?.temperature ?? 0.7,
@@ -42,7 +92,7 @@ export async function callClaude(
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`OpenRouter ${res.status}: ${body}`)
+    throw new Error(`${provider} ${res.status}: ${body}`)
   }
 
   const data = await res.json()
@@ -73,15 +123,17 @@ export async function* streamClaude(
   prompt: string,
   systemPrompt?: string
 ): AsyncGenerator<string> {
+  const { baseUrl, apiKey, model, provider } = await loadSettings()
+
   const messages: { role: string; content: string }[] = []
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
   messages.push({ role: 'user', content: prompt })
 
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: buildHeaders(apiKey, provider),
     body: JSON.stringify({
-      model: getModel(),
+      model,
       messages,
       max_tokens: 8192,
       stream: true,
@@ -90,7 +142,7 @@ export async function* streamClaude(
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`OpenRouter stream ${res.status}: ${body}`)
+    throw new Error(`${provider} stream ${res.status}: ${body}`)
   }
 
   const reader = res.body!.getReader()

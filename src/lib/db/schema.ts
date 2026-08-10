@@ -464,6 +464,14 @@ export const importHistory = pgTable('import_history', {
   errorLog: text('error_log'),
 })
 
+// ─── System Settings ──────────────────────────────────────────────────────────
+
+export const systemSettings = pgTable('system_settings', {
+  key: varchar('key', { length: 100 }).primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({

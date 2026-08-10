@@ -49,6 +49,7 @@ const adminLinks = [
   { href: '/admin/materials', icon: BookOpen, label: 'Materiais' },
   { href: '/admin/statistics', icon: BarChart3, label: 'Estatísticas' },
   { href: '/admin/users', icon: Users, label: 'Alunos' },
+  { href: '/super-admin/settings', icon: Settings, label: 'Configurações IA' },
 ]
 
 const superAdminLinks = [
