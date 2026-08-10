@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +15,8 @@ import { toast } from 'sonner'
 import {
   Upload, X, FileText, Loader2, BookOpen,
   Trash2, Eye, Plus, Sparkles, Pencil, Download,
+  Bold, Italic, List, ListOrdered, Heading2, Heading3,
+  AlignLeft, Code2, Link2, Undo2, Redo2,
 } from 'lucide-react'
 import { createApostila, deleteApostila, getApostilaContent, updateApostila } from '@/server/actions/apostilas'
 import type { ApostilaListItem } from '@/server/actions/apostilas'
@@ -104,6 +106,28 @@ function ApostilaViewer({
 
 // ─── Edit dialog ──────────────────────────────────────────────────────────────
 
+type EditorMode = 'visual' | 'html'
+
+function ToolbarBtn({
+  onClick, title, children, active,
+}: {
+  onClick: () => void
+  title: string
+  children: React.ReactNode
+  active?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      title={title}
+      className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${active ? 'bg-gray-200 text-blue-700' : 'text-gray-600'}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 function EditApostilaDialog({
   apostila, open, onClose, onSaved,
 }: {
@@ -113,27 +137,71 @@ function EditApostilaDialog({
   onSaved: (newTitle: string) => void
 }) {
   const [editTitle, setEditTitle] = useState(apostila.title)
-  const [editHtml, setEditHtml] = useState('')
-  const [tab, setTab] = useState<'edit' | 'preview'>('edit')
+  const [mode, setMode] = useState<EditorMode>('visual')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const editorRef = useRef<HTMLDivElement>(null)
+  // htmlRef holds the canonical HTML string; the contenteditable div owns it while in visual mode
+  const htmlRef = useRef('')
+  const loadedRef = useRef(false)
 
-  // Load content when dialog opens
-  async function handleOpen(isOpen: boolean) {
-    if (!isOpen) { onClose(); return }
-    if (editHtml) return // already loaded
+  // Load content on open — useEffect is reliable; onOpenChange is not for controlled opens
+  useEffect(() => {
+    if (!open || loadedRef.current) return
+    loadedRef.current = true
     setLoading(true)
-    const content = await getApostilaContent(apostila.id)
-    if (content) {
-      setEditTitle(content.title)
-      setEditHtml(content.contentHtml)
+    getApostilaContent(apostila.id).then(content => {
+      if (content) {
+        setEditTitle(content.title)
+        htmlRef.current = content.contentHtml
+        // Set contenteditable innerHTML directly (no React state to avoid re-render fights)
+        if (editorRef.current) {
+          editorRef.current.innerHTML = content.contentHtml
+        }
+      }
+      setLoading(false)
+    })
+  }, [open, apostila.id])
+
+  // Reset on close so re-opening fetches again
+  useEffect(() => {
+    if (!open) {
+      loadedRef.current = false
+      htmlRef.current = ''
     }
-    setLoading(false)
+  }, [open])
+
+  const exec = useCallback((cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value ?? undefined)
+    editorRef.current?.focus()
+  }, [])
+
+  function switchToHtml() {
+    // Snapshot innerHTML before hiding the editor
+    if (editorRef.current) htmlRef.current = editorRef.current.innerHTML
+    setMode('html')
   }
 
+  function switchToVisual() {
+    // Restore innerHTML from the textarea's current value
+    setMode('visual')
+    // innerHTML will be set after the div becomes visible via useEffect
+  }
+
+  // After switching back to visual, push htmlRef into the DOM
+  useEffect(() => {
+    if (mode === 'visual' && editorRef.current && htmlRef.current) {
+      editorRef.current.innerHTML = htmlRef.current
+    }
+  }, [mode])
+
   async function handleSave() {
+    const html = mode === 'visual' && editorRef.current
+      ? editorRef.current.innerHTML
+      : htmlRef.current
+
     setSaving(true)
-    const res = await updateApostila(apostila.id, { title: editTitle, contentHtml: editHtml })
+    const res = await updateApostila(apostila.id, { title: editTitle, contentHtml: html })
     if ('error' in res) {
       toast.error(res.error)
     } else {
@@ -145,7 +213,7 @@ function EditApostilaDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpen}>
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
           <DialogTitle className="text-base">Editar Apostila</DialogTitle>
@@ -167,36 +235,87 @@ function EditApostilaDialog({
               />
             </div>
 
-            {/* Tab switcher */}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit flex-shrink-0">
-              {(['edit', 'preview'] as const).map(t => (
+            {/* Toolbar + mode toggle */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              {mode === 'visual' && (
+                <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-1 flex-wrap">
+                  <ToolbarBtn onClick={() => exec('bold')} title="Negrito (Ctrl+B)">
+                    <Bold className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <ToolbarBtn onClick={() => exec('italic')} title="Itálico (Ctrl+I)">
+                    <Italic className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  <ToolbarBtn onClick={() => exec('formatBlock', 'h2')} title="Título H2">
+                    <Heading2 className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <ToolbarBtn onClick={() => exec('formatBlock', 'h3')} title="Subtítulo H3">
+                    <Heading3 className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <ToolbarBtn onClick={() => exec('formatBlock', 'p')} title="Parágrafo normal">
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  <ToolbarBtn onClick={() => exec('insertUnorderedList')} title="Lista com marcadores">
+                    <List className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <ToolbarBtn onClick={() => exec('insertOrderedList')} title="Lista numerada">
+                    <ListOrdered className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  <ToolbarBtn onClick={() => exec('undo')} title="Desfazer">
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                  <ToolbarBtn onClick={() => exec('redo')} title="Refazer">
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </ToolbarBtn>
+                </div>
+              )}
+
+              <div className="ml-auto flex gap-1 bg-gray-100 p-1 rounded-lg flex-shrink-0">
                 <button
-                  key={t}
                   type="button"
-                  onClick={() => setTab(t)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    tab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  onClick={switchToVisual}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                    mode === 'visual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {t === 'edit' ? 'Editar HTML' : 'Visualizar'}
+                  <AlignLeft className="w-3 h-3" /> Visual
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={switchToHtml}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                    mode === 'html' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Code2 className="w-3 h-3" /> HTML
+                </button>
+              </div>
             </div>
 
-            {/* Editor / Preview */}
-            <div className="flex-1 overflow-hidden rounded-lg border min-h-0">
-              {tab === 'edit' ? (
+            {/* Editor area */}
+            <div className="flex-1 overflow-hidden rounded-lg border min-h-0 relative">
+              {/* Shared apostila styles injected once */}
+              <style dangerouslySetInnerHTML={{ __html: APOSTILA_CSS }} />
+
+              {/* Visual WYSIWYG editor — kept in DOM so ref + undo history survive mode switch */}
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                className="apostila-body w-full overflow-y-auto p-6 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200"
+                style={{ display: mode === 'visual' ? 'block' : 'none', minHeight: '420px', maxHeight: '100%' }}
+              />
+
+              {/* HTML source textarea */}
+              {mode === 'html' && (
                 <textarea
-                  value={editHtml}
-                  onChange={e => setEditHtml(e.target.value)}
+                  defaultValue={htmlRef.current}
+                  onChange={e => { htmlRef.current = e.target.value }}
                   className="w-full h-full resize-none p-4 font-mono text-xs text-gray-700 focus:outline-none"
                   spellCheck={false}
-                  style={{ minHeight: '400px' }}
-                />
-              ) : (
-                <div
-                  className="apostila-body w-full h-full overflow-y-auto p-6"
-                  dangerouslySetInnerHTML={{ __html: `<style>${APOSTILA_CSS}</style>${editHtml}` }}
+                  style={{ minHeight: '420px' }}
                 />
               )}
             </div>
