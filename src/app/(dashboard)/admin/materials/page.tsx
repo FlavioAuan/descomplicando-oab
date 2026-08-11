@@ -4,7 +4,7 @@ import { db, subjects } from '@/lib/db'
 import { listStandaloneApostilas } from '@/server/actions/apostilas'
 import { ApostilasPanel } from '@/components/admin/apostilas-panel'
 
-export const metadata: Metadata = { title: 'Apostilas' }
+export const metadata: Metadata = { title: 'Conteúdo' }
 
 export default async function ApostilasPage() {
   await requireRole('admin', 'super_admin')
@@ -17,10 +17,10 @@ export default async function ApostilasPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Apostilas</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Conteúdo</h1>
         <p className="text-gray-500 mt-1">
-          Crie apostilas completas com IA. Informe o título e, opcionalmente,
-          faça upload de documentos de referência para enriquecer o conteúdo gerado.
+          Crie conteúdos completos com IA. Informe o título e, opcionalmente,
+          faça upload de documentos de referência para enriquecer o material gerado.
         </p>
       </div>
 

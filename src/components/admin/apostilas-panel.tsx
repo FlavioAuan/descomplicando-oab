@@ -204,7 +204,7 @@ function EditApostilaDialog({
     if ('error' in res) {
       toast.error(res.error)
     } else {
-      toast.success('Apostila atualizada')
+      toast.success('Conteúdo atualizado')
       onSaved(editTitle)
       onClose()
     }
@@ -215,7 +215,7 @@ function EditApostilaDialog({
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-shrink-0">
-          <DialogTitle className="text-base">Editar Apostila</DialogTitle>
+          <DialogTitle className="text-base">Editar Conteúdo</DialogTitle>
         </DialogHeader>
 
         {/* Everything stays mounted so editorRef is always available when content loads */}
@@ -352,7 +352,7 @@ function ApostilaCard({
     setDeleting(true)
     const res = await deleteApostila(apostila.id)
     if ('error' in res) toast.error(res.error)
-    else { toast.success('Apostila excluída'); onDelete() }
+    else { toast.success('Conteúdo excluído'); onDelete() }
     setDeleting(false)
   }
 
@@ -360,7 +360,7 @@ function ApostilaCard({
     setPdfLoading(true)
     const content = await getApostilaContent(apostila.id)
     setPdfLoading(false)
-    if (!content) { toast.error('Não foi possível carregar a apostila'); return }
+    if (!content) { toast.error('Não foi possível carregar o conteúdo'); return }
     openApostilaPrintWindow(content.title, content.contentHtml)
   }
 
@@ -447,7 +447,7 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
   }
 
   async function handleCreate() {
-    if (!title.trim()) { toast.error('Informe o título da apostila'); return }
+    if (!title.trim()) { toast.error('Informe o título do conteúdo'); return }
 
     setGenerating(true)
     const fd = new FormData()
@@ -464,7 +464,7 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
       return
     }
 
-    toast.success('Apostila criada com sucesso!')
+    toast.success('Conteúdo criado com sucesso!')
     setPreviewHtml(result.data.contentHtml)
     setPreviewTitle(result.data.title)
     setViewerOpen(true)
@@ -488,11 +488,11 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
       <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold text-gray-900">Criar Nova Apostila</h2>
+          <h2 className="font-semibold text-gray-900">Criar Novo Conteúdo</h2>
         </div>
 
         <div className="space-y-1">
-          <Label htmlFor="title">Título da Apostila <span className="text-red-500">*</span></Label>
+          <Label htmlFor="title">Título do Conteúdo <span className="text-red-500">*</span></Label>
           <Input
             id="title"
             placeholder="Ex: Contratos no Direito Civil — Formação e Extinção"
@@ -572,8 +572,8 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
           size="lg"
         >
           {generating
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando apostila com IA…</>
-            : <><Plus className="w-4 h-4 mr-2" /> Criar Apostila</>}
+            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando conteúdo com IA…</>
+            : <><Plus className="w-4 h-4 mr-2" /> Criar Conteúdo</>}
         </Button>
       </div>
 
@@ -581,7 +581,7 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">
-            Apostilas criadas
+            Conteúdos criados
             {apostilasList.length > 0 && (
               <Badge className="ml-2 bg-gray-100 text-gray-600">{apostilasList.length}</Badge>
             )}
@@ -591,7 +591,7 @@ export function ApostilasPanel({ initialApostilas, subjects }: Props) {
         {apostilasList.length === 0 ? (
           <div className="bg-white rounded-xl border p-10 text-center">
             <BookOpen className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">Nenhuma apostila criada ainda</p>
+            <p className="text-sm text-gray-400">Nenhum conteúdo criado ainda</p>
           </div>
         ) : (
           <div className="space-y-2">
