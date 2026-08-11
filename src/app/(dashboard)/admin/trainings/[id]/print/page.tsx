@@ -5,16 +5,7 @@ import { getTrainingPrintData } from '@/server/actions/training-print'
 import { PrintButton } from '@/components/admin/print-button'
 import { ArrowLeft } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Imprimir Treinamento' }
-
-const TOPIC_TYPE_LABELS: Record<string, string> = {
-  apostila: 'Conteúdo',
-  flashcard: 'Flashcards',
-  exercise: 'Exercícios',
-  simulation: 'Simulado',
-  video: 'Vídeo',
-  review: 'Revisão',
-}
+export const metadata: Metadata = { title: 'Apostila' }
 
 export default async function PrintTrainingPage({
   params,
@@ -25,8 +16,9 @@ export default async function PrintTrainingPage({
   const data = await getTrainingPrintData(id)
   if (!data) notFound()
 
-  const totalChapters = data.days.length
-  const totalContent = data.days.reduce(
+  // Only days that have at least one content piece
+  const daysWithContent = data.days.filter(d => d.topics.some(t => t.apostilaContent))
+  const totalContent = daysWithContent.reduce(
     (acc, d) => acc + d.topics.filter(t => t.apostilaContent).length,
     0
   )
@@ -88,7 +80,7 @@ export default async function PrintTrainingPage({
           marginBottom: '48px',
         }}>
           <div style={{ fontSize: '11px', letterSpacing: '3px', color: '#6B7280', textTransform: 'uppercase', marginBottom: '32px' }}>
-            DescomplicandOAB · Plano de Treinamento
+            DescomplicandOAB · Apostila
           </div>
           <h1 style={{
             fontSize: '36px',
@@ -107,32 +99,31 @@ export default async function PrintTrainingPage({
           )}
           <div style={{ marginTop: '40px', display: 'flex', gap: '32px', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: '#1a56db' }}>{totalChapters}</div>
+              <div style={{ fontSize: '28px', fontWeight: '700', color: '#1a56db' }}>{daysWithContent.length}</div>
               <div style={{ fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' }}>Capítulos</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '700', color: '#1a56db' }}>{totalContent}</div>
-              <div style={{ fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' }}>Conteúdos</div>
+              <div style={{ fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px' }}>Seções</div>
             </div>
           </div>
         </div>
 
         {/* ── Sumário ─────────────────────────────────────────────────────── */}
-        <div style={{ marginBottom: '60px', pageBreakAfter: 'always' }}>
-          <h2 style={{
-            fontSize: '22px',
-            fontWeight: '700',
-            color: '#1a3a5c',
-            borderBottom: '3px solid #1a56db',
-            paddingBottom: '10px',
-            marginBottom: '28px',
-          }}>
-            Sumário
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {data.days.map((day, idx) => {
-              const contentTopics = day.topics.filter(t => t.apostilaContent)
-              return (
+        {daysWithContent.length > 0 && (
+          <div style={{ marginBottom: '60px', pageBreakAfter: 'always' }}>
+            <h2 style={{
+              fontSize: '22px',
+              fontWeight: '700',
+              color: '#1a3a5c',
+              borderBottom: '3px solid #1a56db',
+              paddingBottom: '10px',
+              marginBottom: '28px',
+            }}>
+              Sumário
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {daysWithContent.map((day, idx) => (
                 <div
                   key={day.id}
                   style={{
@@ -156,21 +147,15 @@ export default async function PrintTrainingPage({
                   <span style={{ flex: 1, fontSize: '15px', color: '#1a3a5c', fontWeight: '500' }}>
                     {day.title}
                   </span>
-                  {contentTopics.length > 0 && (
-                    <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      {contentTopics.length} conteúdo{contentTopics.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
                 </div>
-              )
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Capítulos ────────────────────────────────────────────────────── */}
-        {data.days.map((day, idx) => {
+        {daysWithContent.map((day, idx) => {
           const contentTopics = day.topics.filter(t => t.apostilaContent)
-          const otherTopics = day.topics.filter(t => !t.apostilaContent)
 
           return (
             <div key={day.id} style={{ pageBreakBefore: idx > 0 ? 'always' : 'auto', marginBottom: '48px' }}>
@@ -191,28 +176,11 @@ export default async function PrintTrainingPage({
                     {day.description}
                   </p>
                 )}
-                {day.estimatedHours && day.estimatedHours > 0 && (
-                  <div style={{ marginTop: '12px', fontSize: '13px', color: '#93c5fd' }}>
-                    ⏱ {day.estimatedHours}h estimadas
-                  </div>
-                )}
               </div>
 
-              {/* Content topics */}
+              {/* Content only */}
               {contentTopics.map((topic, tIdx) => (
                 <div key={topic.id} style={{ marginBottom: '40px' }}>
-                  {contentTopics.length > 1 && (
-                    <div style={{
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      color: '#1a56db',
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      marginBottom: '8px',
-                    }}>
-                      Conteúdo {tIdx + 1}
-                    </div>
-                  )}
                   <div
                     className="apostila-body"
                     dangerouslySetInnerHTML={{ __html: topic.apostilaContent!.contentHtml }}
@@ -222,53 +190,18 @@ export default async function PrintTrainingPage({
                   )}
                 </div>
               ))}
-
-              {/* Other activities (no apostila) */}
-              {otherTopics.length > 0 && (
-                <div style={{
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: '8px',
-                  border: '1px solid #E2E8F0',
-                  padding: '16px 20px',
-                  marginTop: contentTopics.length > 0 ? '24px' : 0,
-                }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-                    Outras atividades desta etapa
-                  </div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {otherTopics.map(t => (
-                      <li key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#374151' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: '600',
-                          color: '#fff',
-                          backgroundColor: '#6B7280',
-                          borderRadius: '4px',
-                          padding: '2px 6px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          flexShrink: 0,
-                        }}>
-                          {TOPIC_TYPE_LABELS[t.type] ?? t.type}
-                        </span>
-                        {t.title}
-                        {t.estimatedMinutes && (
-                          <span style={{ color: '#9CA3AF', fontSize: '12px' }}>({t.estimatedMinutes} min)</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {contentTopics.length === 0 && otherTopics.length === 0 && (
-                <p style={{ color: '#9CA3AF', fontStyle: 'italic', fontSize: '14px' }}>
-                  Nenhuma atividade cadastrada nesta etapa.
-                </p>
-              )}
             </div>
           )
         })}
+
+        {daysWithContent.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#9CA3AF' }}>
+            <p style={{ fontSize: '16px' }}>Nenhum conteúdo encontrado neste treinamento.</p>
+            <p style={{ fontSize: '14px', marginTop: '8px' }}>
+              Gere os conteúdos nas etapas do treinamento para imprimir a apostila.
+            </p>
+          </div>
+        )}
 
         {/* ── Rodapé ──────────────────────────────────────────────────────── */}
         <div style={{
