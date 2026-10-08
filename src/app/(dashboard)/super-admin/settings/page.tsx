@@ -2,13 +2,16 @@ import { Metadata } from 'next'
 import { requireRole } from '@/server/actions/auth'
 import { getAISettings } from '@/server/actions/settings'
 import { AISettingsForm } from '@/components/admin/ai-settings-form'
+import { getLegacyFilesStatus } from '@/server/actions/legacy-files'
+import { LegacyFilesPanel } from '@/components/super-admin/legacy-files-panel'
 
 export const metadata: Metadata = { title: 'Configurações IA' }
 
 export default async function SettingsPage() {
-  await requireRole('admin', 'super_admin')
+  const user = await requireRole('admin', 'super_admin')
 
   const settings = await getAISettings()
+  const legacyFiles = user.role === 'super_admin' ? await getLegacyFilesStatus() : null
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -25,6 +28,10 @@ export default async function SettingsPage() {
         openrouterModel: settings.openrouterModel,
         openaiModel: settings.openaiModel,
       }} />
+
+      {legacyFiles?.enabled && (
+        <LegacyFilesPanel total={legacyFiles.total} missing={legacyFiles.missing} />
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/server/actions/auth'
 import { db, simulations, simulationQuestions, examQuestions, studentSimulations } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { insertReturning } from '@/lib/db/helpers'
 
 export async function GET(
   req: NextRequest,
@@ -35,13 +36,10 @@ export async function GET(
     .orderBy(simulationQuestions.order)
 
   // Create student simulation record
-  const [studentSim] = await db
-    .insert(studentSimulations)
-    .values({
-      userId: user.id,
-      simulationId: id,
-    })
-    .returning()
+  const [studentSim] = await insertReturning(studentSimulations, {
+    userId: user.id,
+    simulationId: id,
+  })
 
   return NextResponse.json({
     questions: simQuestions,

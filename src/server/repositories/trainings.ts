@@ -10,6 +10,7 @@ import {
   apostilas,
 } from '@/lib/db/schema'
 import type { Training, TrainingStatus } from '@/types'
+import { insertReturning, updateReturning } from '@/lib/db/helpers'
 
 export class TrainingsRepository extends BaseRepository {
   async findById(id: string): Promise<Training | null> {
@@ -73,20 +74,17 @@ export class TrainingsRepository extends BaseRepository {
     targetExam?: number
     createdBy: string
   }): Promise<Training> {
-    const result = await this.db
-      .insert(trainings)
-      .values({
-        name: data.name,
-        description: data.description,
-        hoursPerDay: data.hoursPerDay,
-        daysCount: data.daysCount,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        targetExam: data.targetExam,
-        createdBy: data.createdBy,
-        status: 'draft',
-      })
-      .returning()
+    const result = await insertReturning(trainings, {
+      name: data.name,
+      description: data.description,
+      hoursPerDay: data.hoursPerDay,
+      daysCount: data.daysCount,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      targetExam: data.targetExam,
+      createdBy: data.createdBy,
+      status: 'draft',
+    })
 
     return result[0] as Training
   }
@@ -107,11 +105,7 @@ export class TrainingsRepository extends BaseRepository {
       updateData.publishedAt = new Date()
     }
 
-    const result = await this.db
-      .update(trainings)
-      .set(updateData)
-      .where(eq(trainings.id, id))
-      .returning()
+    const result = await updateReturning(trainings, updateData, eq(trainings.id, id))
 
     return result[0] as Training
   }
@@ -168,17 +162,14 @@ export class TrainingsRepository extends BaseRepository {
     }>
   ): Promise<void> {
     for (const day of days) {
-      const [insertedDay] = await this.db
-        .insert(trainingDays)
-        .values({
-          trainingId,
-          dayNumber: day.dayNumber,
-          title: day.title,
-          description: day.description,
-          estimatedHours: day.estimatedHours,
-          date: day.date,
-        })
-        .returning()
+      const [insertedDay] = await insertReturning(trainingDays, {
+        trainingId,
+        dayNumber: day.dayNumber,
+        title: day.title,
+        description: day.description,
+        estimatedHours: day.estimatedHours,
+        date: day.date,
+      })
 
       if (day.topics.length > 0) {
         await this.db.insert(trainingTopics).values(
@@ -245,13 +236,13 @@ export class TrainingsRepository extends BaseRepository {
     dayId: string,
     data: { title: string; type: string; estimatedMinutes: number; order: number }
   ): Promise<{ id: string }> {
-    const [row] = await this.db.insert(trainingTopics).values({
+    const [row] = await insertReturning(trainingTopics, {
       trainingDayId: dayId,
       title: data.title,
       type: data.type as any,
       estimatedMinutes: data.estimatedMinutes,
       order: data.order,
-    }).returning({ id: trainingTopics.id })
+    })
     return row
   }
 
@@ -266,7 +257,7 @@ export class TrainingsRepository extends BaseRepository {
 
   async countAll(): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(trainings)
 
     return result[0]?.count || 0

@@ -16,8 +16,8 @@ export default async function AdminDashboardPage() {
 
   const [stats, totalStudents, totalTrainings] = await Promise.all([
     getDashboardStats(),
-    db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.role, 'student')),
-    db.select({ count: sql<number>`count(*)::int` }).from(trainings),
+    db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(users).where(eq(users.role, 'student')),
+    db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(trainings),
   ])
 
   return (

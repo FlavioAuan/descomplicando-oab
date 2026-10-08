@@ -1,3 +1,6 @@
+// Reads the database, so it can't be prerendered at build time (Docker build has no DB)
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { BookOpen, ClipboardList, BarChart3, Award, Target, Shield, Scale } from 'lucide-react'

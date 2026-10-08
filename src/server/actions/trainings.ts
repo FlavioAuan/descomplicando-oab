@@ -9,6 +9,7 @@ import { db, subjects, subsubjects, microtopics, apostilas, flashcards, aiGenera
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import type { Training, TrainingStatus } from '@/types'
+import { insertReturning } from '@/lib/db/helpers'
 
 const createTrainingSchema = z.object({
   name: z.string().min(1),
@@ -231,16 +232,13 @@ export async function generateTopicApostila(topicId: string) {
     microtheme: topicData.title,
   })
 
-  const [savedApostila] = await db
-    .insert(apostilas)
-    .values({
-      trainingTopicId: topicId,
-      subjectId: topicData.subjectId,
-      subsubjectId: topicData.subsubjectId,
-      title: `${subject} - ${subtheme}`,
-      contentHtml: content.htmlContent,
-    })
-    .returning()
+  const [savedApostila] = await insertReturning(apostilas, {
+    trainingTopicId: topicId,
+    subjectId: topicData.subjectId,
+    subsubjectId: topicData.subsubjectId,
+    title: `${subject} - ${subtheme}`,
+    contentHtml: content.htmlContent,
+  })
 
   revalidatePath('/admin/trainings')
   return { data: savedApostila }

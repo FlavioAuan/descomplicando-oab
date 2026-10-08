@@ -57,7 +57,7 @@ export class QuestionsRepository extends BaseRepository {
     count: number
     excludeIds?: string[]
   }): Promise<ExamQuestion[]> {
-    const conditions = [sql`length(${examQuestions.alternatives}->>'a') > 5`]
+    const conditions = [sql`length(${examQuestions.alternatives}->>'$.a') > 5`]
     if (params.subjectId) conditions.push(eq(examQuestions.subjectId, params.subjectId))
     if (params.subsubjectId) conditions.push(eq(examQuestions.subsubjectId, params.subsubjectId))
 
@@ -65,7 +65,7 @@ export class QuestionsRepository extends BaseRepository {
       .select()
       .from(examQuestions)
       .where(and(...conditions))
-      .orderBy(sql`RANDOM()`)
+      .orderBy(sql`RAND()`)
       .limit(params.count) as Promise<ExamQuestion[]>
   }
 
@@ -93,7 +93,7 @@ export class QuestionsRepository extends BaseRepository {
 
   async countTotal(): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(examQuestions)
 
     return result[0]?.count || 0
@@ -101,7 +101,7 @@ export class QuestionsRepository extends BaseRepository {
 
   async countClassified(): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(examQuestions)
       .where(eq(examQuestions.classified, true))
 
@@ -120,7 +120,7 @@ export class QuestionsRepository extends BaseRepository {
       .select({
         subjectId: subjects.id,
         subjectName: subjects.name,
-        count: sql<number>`count(${examQuestions.id})::int`,
+        count: sql<number>`count(${examQuestions.id})`.mapWith(Number),
       })
       .from(examQuestions)
       .leftJoin(subjects, eq(examQuestions.subjectId, subjects.id))

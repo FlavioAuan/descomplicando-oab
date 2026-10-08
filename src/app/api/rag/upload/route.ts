@@ -4,7 +4,8 @@ import { requireRole } from '@/server/actions/auth'
 import { processDocument } from '@/lib/ai/rag'
 import { db, knowledgeFiles } from '@/lib/db'
 import { eq } from 'drizzle-orm'
-import { createServiceClient } from '@/lib/supabase/server'
+import { saveFile } from '@/lib/storage'
+import { insertReturning } from '@/lib/db/helpers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,23 +34,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File type not supported' }, { status: 400 })
     }
 
-    // Upload to Supabase Storage
-    const supabase = await createServiceClient()
-    const fileExt = file.name.split('.').pop()
-    const storagePath = `knowledge/${Date.now()}-${file.name}`
+    // Save to the storage volume
+    const storagePath = `knowledge/${Date.now()}-${file.name.replace(/[\/]/g, '_')}`
 
     const buffer = await file.arrayBuffer()
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('materials')
-      .upload(storagePath, buffer, { contentType: file.type, upsert: false })
-
-    if (uploadError) {
-      return NextResponse.json({ error: 'Upload failed: ' + uploadError.message }, { status: 500 })
+    let fileUrl: string
+    try {
+      fileUrl = await saveFile('materials', storagePath, buffer)
+    } catch (uploadError) {
+      return NextResponse.json({ error: 'Upload failed: ' + (uploadError as Error).message }, { status: 500 })
     }
-
-    const { data: urlData } = supabase.storage
-      .from('materials')
-      .getPublicUrl(uploadData.path)
 
     // Create knowledge file record
     const fileTypeMap: Record<string, string> = {
@@ -59,18 +53,15 @@ export async function POST(req: NextRequest) {
       'application/epub+zip': 'epub',
     }
 
-    const [knowledgeFile] = await db
-      .insert(knowledgeFiles)
-      .values({
-        name: name || file.name,
-        originalName: file.name,
-        fileType: (fileTypeMap[file.type] || 'txt') as any,
-        url: urlData.publicUrl,
-        sizeBytes: file.size,
-        subjectId: subjectId || null,
-        uploadedBy: user.id,
-      })
-      .returning()
+    const [knowledgeFile] = await insertReturning(knowledgeFiles, {
+      name: name || file.name,
+      originalName: file.name,
+      fileType: (fileTypeMap[file.type] || 'txt') as any,
+      url: fileUrl,
+      sizeBytes: file.size,
+      subjectId: subjectId || null,
+      uploadedBy: user.id,
+    })
 
     // Extract text and process
     let text = ''
@@ -100,7 +91,7 @@ export async function POST(req: NextRequest) {
       fileId: knowledgeFile.id,
       name: knowledgeFile.name,
       chunkCount,
-      url: urlData.publicUrl,
+      url: fileUrl,
     })
   } catch (error) {
     console.error('Upload error:', error)

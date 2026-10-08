@@ -9,6 +9,7 @@ import {
   statistics,
 } from '@/lib/db'
 import { eq, and, isNull, sql } from 'drizzle-orm'
+import { insertReturning } from '@/lib/db/helpers'
 
 // Largest-remainder proportional distribution
 function distributeByHistory(
@@ -89,8 +90,8 @@ export async function POST(req: NextRequest) {
         .select({ id: examQuestions.id })
         .from(examQuestions)
         .innerJoin(exams, and(eq(examQuestions.examId, exams.id), eq(exams.isActive, true)))
-        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'a') > 5`))
-        .orderBy(sql`RANDOM()`)
+        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'$.a') > 5`))
+        .orderBy(sql`RAND()`)
         .limit(count)
       selectedIds.push(...qs.map((q) => q.id))
     }
@@ -101,8 +102,8 @@ export async function POST(req: NextRequest) {
         .select({ id: examQuestions.id })
         .from(examQuestions)
         .innerJoin(exams, and(eq(examQuestions.examId, exams.id), eq(exams.isActive, true)))
-        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'a') > 5`))
-        .orderBy(sql`RANDOM()`)
+        .where(and(eq(examQuestions.subjectId, subjectId), sql`length(${examQuestions.alternatives}->>'$.a') > 5`))
+        .orderBy(sql`RAND()`)
         .limit(count)
       selectedIds.push(...qs.map((q) => q.id))
     }
@@ -120,17 +121,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const [sim] = await db
-    .insert(simulations)
-    .values({
-      name: name.trim(),
-      type: type as 'general' | 'subject' | 'topic' | 'predicted' | 'adaptive',
-      timeLimitMinutes: timeLimitMinutes ?? 300,
-      totalQuestions: selectedIds.length,
-      isAdaptive: type === 'adaptive',
-      createdBy: user.id,
-    })
-    .returning()
+  const [sim] = await insertReturning(simulations, {
+    name: name.trim(),
+    type: type as 'general' | 'subject' | 'topic' | 'predicted' | 'adaptive',
+    timeLimitMinutes: timeLimitMinutes ?? 300,
+    totalQuestions: selectedIds.length,
+    isAdaptive: type === 'adaptive',
+    createdBy: user.id,
+  })
 
   await db.insert(simulationQuestions).values(
     selectedIds.map((qId, i) => ({

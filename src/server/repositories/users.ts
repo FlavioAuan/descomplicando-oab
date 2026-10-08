@@ -1,12 +1,15 @@
-import { eq } from 'drizzle-orm'
+import { eq, getTableColumns, sql } from 'drizzle-orm'
 import { BaseRepository } from './base'
 import { users } from '@/lib/db/schema'
 import type { User, Role } from '@/types'
 
+// Never select password_hash by default — user objects reach client components.
+const { passwordHash: _passwordHash, ...publicColumns } = getTableColumns(users)
+
 export class UsersRepository extends BaseRepository {
   async findByAuthId(authId: string): Promise<User | null> {
     const result = await this.db
-      .select()
+      .select(publicColumns)
       .from(users)
       .where(eq(users.authId, authId))
       .limit(1)
@@ -16,7 +19,7 @@ export class UsersRepository extends BaseRepository {
 
   async findById(id: string): Promise<User | null> {
     const result = await this.db
-      .select()
+      .select(publicColumns)
       .from(users)
       .where(eq(users.id, id))
       .limit(1)
@@ -26,31 +29,51 @@ export class UsersRepository extends BaseRepository {
 
   async findByEmail(email: string): Promise<User | null> {
     const result = await this.db
-      .select()
+      .select(publicColumns)
       .from(users)
-      .where(eq(users.email, email))
+      .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
       .limit(1)
 
     return (result[0] as User) || null
   }
 
+  async findCredentialsByEmail(email: string): Promise<{ id: string; passwordHash: string | null } | null> {
+    const result = await this.db
+      .select({ id: users.id, passwordHash: users.passwordHash })
+      .from(users)
+      .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
+      .limit(1)
+
+    return result[0] || null
+  }
+
+  async setPassword(id: string, passwordHash: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, id))
+  }
+
   async create(data: {
-    authId: string
+    authId?: string
     email: string
     name: string
+    passwordHash?: string
     role?: Role
   }): Promise<User> {
-    const result = await this.db
+    const id = crypto.randomUUID()
+    await this.db
       .insert(users)
       .values({
-        authId: data.authId,
+        id,
+        authId: data.authId ?? crypto.randomUUID(),
         email: data.email,
         name: data.name,
+        passwordHash: data.passwordHash,
         role: data.role || 'student',
       })
-      .returning()
 
-    return result[0] as User
+    return (await this.findById(id)) as User
   }
 
   async update(id: string, data: Partial<{
@@ -62,13 +85,12 @@ export class UsersRepository extends BaseRepository {
     streak: number
     lastActiveAt: Date
   }>): Promise<User> {
-    const result = await this.db
+    await this.db
       .update(users)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(users.id, id))
-      .returning()
 
-    return result[0] as User
+    return (await this.findById(id)) as User
   }
 
   async addXp(id: string, xp: number): Promise<User> {
@@ -99,7 +121,7 @@ export class UsersRepository extends BaseRepository {
   }
 
   async listAll(): Promise<User[]> {
-    return this.db.select().from(users) as Promise<User[]>
+    return this.db.select(publicColumns).from(users) as Promise<User[]>
   }
 
   async countByRole(role: Role): Promise<number> {

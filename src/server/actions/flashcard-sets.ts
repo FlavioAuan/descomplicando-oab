@@ -5,6 +5,7 @@ import { requireRole } from './auth'
 import { db, flashcardSets, flashcardSetCards, apostilas } from '@/lib/db'
 import { eq, desc } from 'drizzle-orm'
 import { generateFlashcardSet } from '@/lib/ai/generate'
+import { insertReturning } from '@/lib/db/helpers'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,11 +66,11 @@ export async function createFlashcardSet(formData: FormData): Promise<
 
   if (!cards.length) return { error: 'A IA não gerou flashcards. Tente novamente.' }
 
-  const [set] = await db.insert(flashcardSets).values({
+  const [set] = await insertReturning(flashcardSets, {
     title,
     apostilaId,
     cardCount: cards.length,
-  }).returning()
+  })
 
   await db.insert(flashcardSetCards).values(
     cards.map((c, i) => ({

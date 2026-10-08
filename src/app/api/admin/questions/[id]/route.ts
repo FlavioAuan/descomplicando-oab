@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/server/actions/auth'
 import { db, examQuestions } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { updateReturning } from '@/lib/db/helpers'
 
 export async function PATCH(
   req: NextRequest,
@@ -29,11 +30,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 })
   }
 
-  const [updated] = await db
-    .update(examQuestions)
-    .set(updates)
-    .where(eq(examQuestions.id, id))
-    .returning()
+  const [updated] = await updateReturning(examQuestions, updates, eq(examQuestions.id, id))
 
   if (!updated) {
     return NextResponse.json({ error: 'Questão não encontrada' }, { status: 404 })

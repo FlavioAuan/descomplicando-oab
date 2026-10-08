@@ -5,6 +5,7 @@ import { classifyBatch } from '@/lib/ai/classify'
 import { questionsRepository } from '@/server/repositories/questions'
 import { db, subjects, subsubjects, microtopics } from '@/lib/db'
 import { eq } from 'drizzle-orm'
+import { insertReturning } from '@/lib/db/helpers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,11 +42,9 @@ export async function POST(req: NextRequest) {
       )
 
       if (!subject) {
-        const [newSubject] = await db
-          .insert(subjects)
-          .values({ name: classification.discipline })
-          .onConflictDoNothing()
-          .returning()
+        // subjects.name is unique: ignore duplicates and read the row back
+        await db.insert(subjects).ignore().values({ name: classification.discipline })
+        const [newSubject] = await db.select().from(subjects).where(eq(subjects.name, classification.discipline)).limit(1)
         subject = newSubject
       }
 
@@ -62,14 +61,10 @@ export async function POST(req: NextRequest) {
       )
 
       if (!subsubject) {
-        const [newSub] = await db
-          .insert(subsubjects)
-          .values({
-            subjectId: subject.id,
-            name: classification.subtheme,
-          })
-          .onConflictDoNothing()
-          .returning()
+        const [newSub] = await insertReturning(subsubjects, {
+          subjectId: subject.id,
+          name: classification.subtheme,
+        })
         subsubject = newSub
       }
 
@@ -86,14 +81,10 @@ export async function POST(req: NextRequest) {
       )
 
       if (!microtopic) {
-        const [newMicro] = await db
-          .insert(microtopics)
-          .values({
-            subsubjectId: subsubject.id,
-            name: classification.microtheme,
-          })
-          .onConflictDoNothing()
-          .returning()
+        const [newMicro] = await insertReturning(microtopics, {
+          subsubjectId: subsubject.id,
+          name: classification.microtheme,
+        })
         microtopic = newMicro
       }
 

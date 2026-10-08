@@ -14,6 +14,7 @@ import {
 import { eq, and, sql } from 'drizzle-orm'
 import { awardXp, updateStreak, checkAndAwardAchievements } from '../services/gamification'
 import { calculateNextReview, generateCode } from '@/lib/utils'
+import { insertReturning } from '@/lib/db/helpers'
 
 export async function submitAnswer(params: {
   questionId: string
@@ -39,16 +40,13 @@ export async function submitAnswer(params: {
     await awardXp(user.id, 'ANSWER_CORRECT')
   } else {
     // Add to error notebook
-    await db
-      .insert(errorNotebook)
-      .values({
+    await db.insert(errorNotebook).ignore().values({
         userId: user.id,
         questionId: params.questionId,
         errorAnswer: params.answer,
         correctAnswer: params.correctAnswer,
         nextReviewAt: calculateNextReview(0, false),
       })
-      .onConflictDoNothing()
   }
 
   return { isCorrect }
@@ -92,12 +90,12 @@ export async function completeSimulation(studentSimulationId: string) {
 
   // Check achievements
   const totalCorrectAll = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(studentAnswers)
     .where(and(eq(studentAnswers.userId, user.id), eq(studentAnswers.isCorrect, true)))
 
   const simsCompleted = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(studentSimulations)
     .where(
       and(
@@ -229,16 +227,13 @@ export async function issueCertificate(params: {
   const user = await requireUser()
   const code = generateCode()
 
-  const [cert] = await db
-    .insert(certificates)
-    .values({
-      userId: user.id,
-      trainingId: params.trainingId,
-      hoursCompleted: params.hoursCompleted,
-      averageScore: params.averageScore,
-      code,
-    })
-    .returning()
+  const [cert] = await insertReturning(certificates, {
+    userId: user.id,
+    trainingId: params.trainingId,
+    hoursCompleted: params.hoursCompleted,
+    averageScore: params.averageScore,
+    code,
+  })
 
   await awardXp(user.id, 'COMPLETE_TRAINING')
 
@@ -252,14 +247,14 @@ export async function getStudentDashboard() {
   const [answersResult, errorsResult, simsResult] = await Promise.all([
     db
       .select({
-        total: sql<number>`count(*)::int`,
-        correct: sql<number>`sum(case when is_correct then 1 else 0 end)::int`,
+        total: sql<number>`count(*)`.mapWith(Number),
+        correct: sql<number>`sum(case when is_correct then 1 else 0 end)`.mapWith(Number),
       })
       .from(studentAnswers)
       .where(eq(studentAnswers.userId, user.id)),
 
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(errorNotebook)
       .where(
         and(

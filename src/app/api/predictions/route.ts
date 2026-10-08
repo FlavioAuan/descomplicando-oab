@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const topicFrequency = await getTopicFrequency()
 
     const totalExamsResult = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(exams)
     const examCount = totalExamsResult[0]?.count || 0
 

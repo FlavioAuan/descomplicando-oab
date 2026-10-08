@@ -97,7 +97,7 @@ export async function saveAISettings(
     db
       .insert(systemSettings)
       .values({ key, value, updatedAt: now })
-      .onConflictDoUpdate({ target: systemSettings.key, set: { value, updatedAt: now } })
+      .onDuplicateKeyUpdate({ set: { value, updatedAt: now } })
 
   await Promise.all([
     upsert('ai_provider', provider),

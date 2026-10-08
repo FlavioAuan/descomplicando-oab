@@ -161,6 +161,6 @@ export async function seedDefaultAchievements(): Promise<void> {
   ]
 
   for (const ach of defaults) {
-    await db.insert(achievements).values(ach).onConflictDoNothing()
+    await db.insert(achievements).ignore().values(ach)
   }
 }

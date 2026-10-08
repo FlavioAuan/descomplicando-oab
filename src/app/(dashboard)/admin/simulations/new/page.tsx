@@ -38,7 +38,7 @@ export default async function NewSimulationPage() {
   const qCountRows = await db
     .select({
       subjectId: examQuestions.subjectId,
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(*)`.mapWith(Number),
     })
     .from(examQuestions)
     .where(sql`${examQuestions.subjectId} IS NOT NULL`)

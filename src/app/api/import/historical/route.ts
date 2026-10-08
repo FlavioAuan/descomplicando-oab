@@ -359,7 +359,7 @@ async function importSingleExam(
     gabBuffer = await fetchBuffer(source.gabaritoUrl)
   }
 
-  // ── Step 2: Upload to Supabase Storage ─────────────────────────────────────
+  // ── Step 2: Save PDFs to the storage volume ───────────────────────────────
 
   if (pdfBuffer) {
     try {

@@ -49,3 +49,8 @@ supabase/.temp/
 
 # OAB pipeline PDFs (large files, not needed in repo)
 scripts/data/pdfs/
+
+# uploaded files (local storage volume)
+/storage
+.env.mysql.local
+supabase-dados.sql*

@@ -5,6 +5,7 @@ import { requireRole } from './auth'
 import { db, apostilas, subjects } from '@/lib/db'
 import { desc, isNull, eq } from 'drizzle-orm'
 import { generateApostila } from '@/lib/ai/generate'
+import { insertReturning } from '@/lib/db/helpers'
 
 // ─── Text extraction ──────────────────────────────────────────────────────────
 
@@ -71,15 +72,12 @@ export async function createApostila(formData: FormData): Promise<
     ragContext: ragContext || undefined,
   })
 
-  const [saved] = await db
-    .insert(apostilas)
-    .values({
-      title,
-      contentHtml: content.htmlContent,
-      subjectId: subjectMatch?.id ?? null,
-      generatedBy: 'ai',
-    })
-    .returning()
+  const [saved] = await insertReturning(apostilas, {
+    title,
+    contentHtml: content.htmlContent,
+    subjectId: subjectMatch?.id ?? null,
+    generatedBy: 'ai',
+  })
 
   revalidatePath('/admin/materials')
   return { data: { id: saved.id, title: saved.title, contentHtml: saved.contentHtml } }
@@ -158,15 +156,12 @@ export async function createApostilaForTopic(
     ragContext: ragContext || undefined,
   })
 
-  const [saved] = await db
-    .insert(apostilas)
-    .values({
-      title,
-      contentHtml: content.htmlContent,
-      trainingTopicId: topicId,
-      generatedBy: 'ai',
-    })
-    .returning()
+  const [saved] = await insertReturning(apostilas, {
+    title,
+    contentHtml: content.htmlContent,
+    trainingTopicId: topicId,
+    generatedBy: 'ai',
+  })
 
   revalidatePath('/admin/trainings')
   return { data: { id: saved.id, title: saved.title } }

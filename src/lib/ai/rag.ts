@@ -53,22 +53,19 @@ export async function searchKnowledge(params: {
 }): Promise<Array<{ content: string; fileId: string; relevance: number }>> {
   const limit = params.limit || 5
 
-  // Simple text search using PostgreSQL full-text search
-  // In production, you'd use pgvector with embeddings
+  // MySQL full-text search (requires the FULLTEXT index knowledge_chunks_content_ft)
+  const match = sql`MATCH(${knowledgeChunks.content}) AGAINST(${params.query} IN NATURAL LANGUAGE MODE)`
   const results = await db
     .select({
       content: knowledgeChunks.content,
       fileId: knowledgeChunks.fileId,
-      relevance: sql<number>`ts_rank(
-        to_tsvector('portuguese', ${knowledgeChunks.content}),
-        plainto_tsquery('portuguese', ${params.query})
-      )`.as('relevance'),
+      relevance: sql<number>`${match}`.mapWith(Number).as('relevance'),
     })
     .from(knowledgeChunks)
     .where(
       params.subjectId
-        ? sql`${knowledgeChunks.subjectId} = ${params.subjectId} AND to_tsvector('portuguese', ${knowledgeChunks.content}) @@ plainto_tsquery('portuguese', ${params.query})`
-        : sql`to_tsvector('portuguese', ${knowledgeChunks.content}) @@ plainto_tsquery('portuguese', ${params.query})`
+        ? sql`${knowledgeChunks.subjectId} = ${params.subjectId} AND ${match} > 0`
+        : sql`${match} > 0`
     )
     .orderBy(sql`relevance DESC`)
     .limit(limit)

@@ -29,8 +29,8 @@ export default async function FlashcardsPage() {
 
   const stats = await db
     .select({
-      total: sql<number>`count(*)::int`,
-      mastered: sql<number>`sum(case when correct >= 3 then 1 else 0 end)::int`,
+      total: sql<number>`count(*)`.mapWith(Number),
+      mastered: sql<number>`sum(case when correct >= 3 then 1 else 0 end)`.mapWith(Number),
     })
     .from(studentFlashcardProgress)
     .where(eq(studentFlashcardProgress.userId, user.id))

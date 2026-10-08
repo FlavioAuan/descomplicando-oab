@@ -1,12 +1,19 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "mysql",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1786376267303,
-      "tag": "0000_add_system_settings",
+      "version": "5",
+      "when": 1791486134871,
+      "tag": "0000_initial_mysql",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1791486137037,
+      "tag": "0001_knowledge_fulltext",
       "breakpoints": true
     }
   ]

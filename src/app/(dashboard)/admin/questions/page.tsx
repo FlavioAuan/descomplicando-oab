@@ -48,7 +48,7 @@ export default async function QuestionsPage({
       .orderBy(desc(exams.examNumber)),
 
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(examQuestions)
       .innerJoin(exams, eq(examQuestions.examId, exams.id))
       .where(whereClause),

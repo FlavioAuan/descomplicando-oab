@@ -1,8 +1,9 @@
 import { db } from '@/lib/db'
 import { exams, examQuestions, importHistory } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { createServiceClient } from '@/lib/supabase/server'
+import { saveFile } from '@/lib/storage'
 import { callClaudeJSON } from '@/lib/ai/claude'
+import { insertReturning } from '@/lib/db/helpers'
 
 export interface ImportedExam {
   examNumber: number
@@ -43,25 +44,22 @@ export async function importExamToDatabase(
   if (existing.length > 0) {
     examId = existing[0].id
   } else {
-    const [insertedExam] = await db
-      .insert(exams)
-      .values({
-        examNumber: examData.examNumber,
-        year: examData.year,
-        examDate: examData.examDate,
-        pdfUrl: examData.pdfUrl,
-        gabaritoUrl: examData.gabaritoUrl,
-        totalQuestions: examData.questions.length,
-        importedAt: new Date(),
-      })
-      .returning({ id: exams.id })
+    const [insertedExam] = await insertReturning(exams, {
+      examNumber: examData.examNumber,
+      year: examData.year,
+      examDate: examData.examDate,
+      pdfUrl: examData.pdfUrl,
+      gabaritoUrl: examData.gabaritoUrl,
+      totalQuestions: examData.questions.length,
+      importedAt: new Date(),
+    })
 
     examId = insertedExam.id
   }
 
   // Insert questions
   if (examData.questions.length > 0) {
-    await db.insert(examQuestions).values(
+    await db.insert(examQuestions).ignore().values(
       examData.questions.map((q) => ({
         examId,
         number: q.number,
@@ -69,7 +67,7 @@ export async function importExamToDatabase(
         alternatives: q.alternatives,
         correctAnswer: q.correctAnswer,
       }))
-    ).onConflictDoNothing()
+    )
   }
 
   return { examId, questionCount: examData.questions.length }
@@ -79,15 +77,12 @@ export async function createImportRecord(params: {
   source: string
   importedBy?: string | null
 }): Promise<string> {
-  const [record] = await db
-    .insert(importHistory)
-    .values({
-      source: params.source,
-      status: 'running',
-      // importedBy is a UUID ref to users — null for system/background imports
-      startedAt: new Date(),
-    })
-    .returning({ id: importHistory.id })
+  const [record] = await insertReturning(importHistory, {
+    source: params.source,
+    status: 'running',
+    // importedBy is a UUID ref to users — null for system/background imports
+    startedAt: new Date(),
+  })
 
   return record.id
 }
@@ -118,25 +113,9 @@ export async function updateImportRecord(
 export async function uploadPdfToStorage(
   bucket: string,
   path: string,
-  pdfBuffer: Buffer,
-  contentType = 'application/pdf'
+  pdfBuffer: Buffer
 ): Promise<string> {
-  const supabase = await createServiceClient()
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(path, pdfBuffer, {
-      contentType,
-      upsert: true,
-    })
-
-  if (error) throw new Error(`Upload failed: ${error.message}`)
-
-  const { data: urlData } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(data.path)
-
-  return urlData.publicUrl
+  return saveFile(bucket, path, pdfBuffer)
 }
 
 export async function getImportHistory() {

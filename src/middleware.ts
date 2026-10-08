@@ -1,33 +1,8 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-
-function stripBom(s: string) {
-  return s.replace(/^﻿/, '').trim()
-}
+import { SESSION_COOKIE, verifySession } from '@/lib/auth/session'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''),
-    stripBom(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
+  const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value)
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/register')
@@ -37,15 +12,18 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/student') ||
     request.nextUrl.pathname.startsWith('/dashboard')
 
-  if (!user && isProtectedPage) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!session && isProtectedPage) {
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    // Drop an invalid/expired cookie so the user isn't stuck in a loop
+    response.cookies.delete(SESSION_COOKIE)
+    return response
   }
 
-  if (user && isAuthPage) {
+  if (session && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return supabaseResponse
+  return NextResponse.next()
 }
 
 export const config = {

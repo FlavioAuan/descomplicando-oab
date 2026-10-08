@@ -5,6 +5,7 @@ import { requireRole } from './auth'
 import { db, exams, examQuestions, subjects, subsubjects } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { callClaudeJSON } from '@/lib/ai/claude'
+import { insertReturning } from '@/lib/db/helpers'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export async function saveExam(data: {
 
   try {
     const now = new Date()
-    const [exam] = await db.insert(exams).values({
+    const [exam] = await insertReturning(exams, {
       examNumber: data.examNumber,
       year: data.year,
       examDate: data.examDate || undefined,
@@ -214,7 +215,7 @@ export async function saveExam(data: {
       totalQuestions: data.questions.length,
       isActive: true,
       importedAt: now,
-    }).returning()
+    })
 
     const CHUNK = 20
     for (let i = 0; i < data.questions.length; i += CHUNK) {

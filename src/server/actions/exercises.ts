@@ -6,6 +6,7 @@ import { db, exerciseSets, exerciseQuestions, studentExerciseProgress, apostilas
 import { eq, desc } from 'drizzle-orm'
 import { generateExerciseSet } from '@/lib/ai/generate'
 import { getCurrentUser } from '@/server/actions/auth'
+import { insertReturning } from '@/lib/db/helpers'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,11 +71,11 @@ export async function createExerciseSet(formData: FormData): Promise<
   if (!questions.length) return { error: 'A IA não gerou questões. Tente novamente.' }
 
   // Save set
-  const [set] = await db.insert(exerciseSets).values({
+  const [set] = await insertReturning(exerciseSets, {
     title,
     apostilaId,
     questionCount: questions.length,
-  }).returning()
+  })
 
   // Save questions
   await db.insert(exerciseQuestions).values(

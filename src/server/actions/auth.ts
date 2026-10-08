@@ -1,11 +1,12 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
 import { usersRepository } from '../repositories/users'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { hashPassword, verifyPassword } from '@/lib/auth/password'
+import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from '@/lib/auth/session'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -16,15 +17,20 @@ const registerSchema = loginSchema.extend({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
 })
 
-function stripBom(s: string) {
-  return s.replace(/^﻿/, '').trim()
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase()
 }
 
-function getAdminClient() {
-  return createAdminClient(
-    stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL!),
-    stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY!)
-  )
+async function startSession(userId: string) {
+  const token = await signSession({ userId })
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_MAX_AGE,
+  })
 }
 
 export async function login(formData: FormData) {
@@ -38,30 +44,16 @@ export async function login(formData: FormData) {
     return { error: validated.error.errors[0].message }
   }
 
-  const supabase = await createClient()
-  const { data: signInData, error } = await supabase.auth.signInWithPassword({
-    email: validated.data.email,
-    password: validated.data.password,
-  })
+  const credentials = await usersRepository.findCredentialsByEmail(normalizeEmail(validated.data.email))
+  const valid =
+    credentials?.passwordHash != null &&
+    (await verifyPassword(validated.data.password, credentials.passwordHash))
 
-  if (error) {
+  if (!credentials || !valid) {
     return { error: 'Credenciais inválidas. Verifique seu email e senha.' }
   }
 
-  // Ensure user record exists in our users table (may be missing if created via admin API)
-  if (signInData.user) {
-    const existing = await usersRepository.findByAuthId(signInData.user.id)
-    if (!existing) {
-      try {
-        await usersRepository.create({
-          authId: signInData.user.id,
-          email: validated.data.email,
-          name: signInData.user.user_metadata?.name ?? validated.data.email.split('@')[0],
-        })
-      } catch { /* ignore if already exists */ }
-    }
-  }
-
+  await startSession(credentials.id)
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
@@ -78,60 +70,35 @@ export async function register(formData: FormData) {
     return { error: validated.error.errors[0].message }
   }
 
-  // Use admin client to create user with email auto-confirmed (no confirmation email needed)
-  const adminClient = getAdminClient()
-  const { data, error } = await adminClient.auth.admin.createUser({
-    email: validated.data.email,
-    password: validated.data.password,
-    email_confirm: true,
-    user_metadata: { name: validated.data.name },
-  })
-
-  if (error) {
-    if (error.message.includes('already registered') || error.message.includes('already exists')) {
-      return { error: 'Este email já está cadastrado.' }
-    }
-    return { error: error.message }
+  const email = normalizeEmail(validated.data.email)
+  if (await usersRepository.findByEmail(email)) {
+    return { error: 'Este email já está cadastrado.' }
   }
 
-  if (data.user) {
-    try {
-      await usersRepository.create({
-        authId: data.user.id,
-        email: validated.data.email,
-        name: validated.data.name,
-      })
-    } catch (dbError) {
-      console.error('Failed to create user profile:', dbError)
-    }
-  }
-
-  // Sign in immediately after registration
-  const supabase = await createClient()
-  await supabase.auth.signInWithPassword({
-    email: validated.data.email,
-    password: validated.data.password,
+  const user = await usersRepository.create({
+    email,
+    name: validated.data.name,
+    passwordHash: await hashPassword(validated.data.password),
   })
 
+  await startSession(user.id)
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }
 
 export async function logout() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+  const cookieStore = await cookies()
+  cookieStore.delete(SESSION_COOKIE)
   revalidatePath('/', 'layout')
   redirect('/login')
 }
 
 export async function getCurrentUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value)
+  if (!session) return null
 
-  if (!user) return null
-
-  const dbUser = await usersRepository.findByAuthId(user.id)
-  return dbUser
+  return usersRepository.findById(session.userId)
 }
 
 export async function requireUser() {

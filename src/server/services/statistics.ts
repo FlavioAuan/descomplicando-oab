@@ -15,13 +15,13 @@ export interface SubjectStat {
 
 export async function calculateSubjectStatistics(): Promise<SubjectStat[]> {
   const totalExamsResult = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(exams)
 
   const totalExams = totalExamsResult[0]?.count || 1
 
   const totalQuestionsResult = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(examQuestions)
     .where(sql`${examQuestions.subjectId} IS NOT NULL`)
 
@@ -31,8 +31,8 @@ export async function calculateSubjectStatistics(): Promise<SubjectStat[]> {
     .select({
       subjectId: subjects.id,
       subjectName: subjects.name,
-      totalQuestions: sql<number>`count(${examQuestions.id})::int`,
-      presenceInExams: sql<number>`count(DISTINCT ${examQuestions.examId})::int`,
+      totalQuestions: sql<number>`count(${examQuestions.id})`.mapWith(Number),
+      presenceInExams: sql<number>`count(DISTINCT ${examQuestions.examId})`.mapWith(Number),
     })
     .from(examQuestions)
     .innerJoin(subjects, eq(examQuestions.subjectId, subjects.id))
@@ -52,7 +52,7 @@ export async function calculateSubjectStatistics(): Promise<SubjectStat[]> {
     ? await db
         .select({
           subjectId: examQuestions.subjectId,
-          recentCount: sql<number>`count(*)::int`,
+          recentCount: sql<number>`count(*)`.mapWith(Number),
         })
         .from(examQuestions)
         .where(inArray(examQuestions.examId, recentExamIds))
@@ -98,7 +98,7 @@ export async function getTopicFrequency(): Promise<Array<{
   trend: 'growing' | 'stable' | 'declining'
 }>> {
   const totalExamsResult = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(exams)
   const totalExams = totalExamsResult[0]?.count || 1
 
@@ -116,8 +116,8 @@ export async function getTopicFrequency(): Promise<Array<{
       subsubjectId: subsubjects.id,
       subjectName: subjects.name,
       subsubjectName: subsubjects.name,
-      totalQuestions: sql<number>`count(${examQuestions.id})::int`,
-      presenceInExams: sql<number>`count(DISTINCT ${examQuestions.examId})::int`,
+      totalQuestions: sql<number>`count(${examQuestions.id})`.mapWith(Number),
+      presenceInExams: sql<number>`count(DISTINCT ${examQuestions.examId})`.mapWith(Number),
     })
     .from(examQuestions)
     .innerJoin(subjects, eq(examQuestions.subjectId, subjects.id))
@@ -130,7 +130,7 @@ export async function getTopicFrequency(): Promise<Array<{
     ? await db
         .select({
           subsubjectId: examQuestions.subsubjectId,
-          recentCount: sql<number>`count(*)::int`,
+          recentCount: sql<number>`count(*)`.mapWith(Number),
         })
         .from(examQuestions)
         .where(inArray(examQuestions.examId, recentExamIds))
@@ -184,10 +184,10 @@ export async function getHotTopics(): Promise<Array<{
 
 export async function getDashboardStats() {
   const [totalExamsResult, totalQuestionsResult, classifiedResult] = await Promise.all([
-    db.select({ count: sql<number>`count(*)::int` }).from(exams),
-    db.select({ count: sql<number>`count(*)::int` }).from(examQuestions),
+    db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(exams),
+    db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(examQuestions),
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(examQuestions)
       .where(eq(examQuestions.classified, true)),
   ])
