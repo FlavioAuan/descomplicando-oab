@@ -6,11 +6,14 @@
  * quando as tabelas já foram criadas automaticamente.
  * Pode ser importado várias vezes: apaga os dados das tabelas antes de inserir.
  *
- * Lê de .env.mysql.local:
- *   SUPABASE_DB_URL=postgresql://...      (Session pooler)
- *   SUPABASE_URL=https://xxxx.supabase.co  (para importar os arquivos depois)
+ * Origem dos dados (uma das duas):
+ *   a) Conexão direta — .env.mysql.local: SUPABASE_DB_URL=postgresql://... (Session pooler)
+ *        npx tsx scripts/export-supabase-sql.ts
+ *   b) CSV exportado do SQL Editor do Supabase (consulta em scripts/export-supabase-query.sql)
+ *        npx tsx scripts/export-supabase-sql.ts --csv "caminho/do/arquivo.csv"
  *
- *   npx tsx scripts/export-supabase-sql.ts   ➜ gera supabase-dados.sql.gz
+ * SUPABASE_URL=https://xxxx.supabase.co (em .env.mysql.local) habilita a importação
+ * dos arquivos depois. Gera supabase-dados.sql.gz na pasta do projeto.
  */
 
 process.env.TZ = 'UTC' // Supabase timestamps are UTC; keep them unchanged
@@ -48,8 +51,22 @@ function rewriteUrls<T>(value: T): T {
   return value
 }
 
+type Row = Record<string, unknown>
+interface Source {
+  tables: Map<string, Row[]>
+  authUsers: Array<{ id: string; encrypted_password: string | null }>
+}
+
+// Postgres timestamps come as Date (direct connection) or ISO strings (CSV/JSON)
+function toUtcDate(value: unknown): Date {
+  if (value instanceof Date) return value
+  const s = String(value)
+  return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z')
+}
+
 function convert(value: unknown, columnType: string): unknown {
   if (value === null || value === undefined) return null
+  if (columnType === 'MySqlTimestamp') return toUtcDate(value)
   if (columnType === 'MySqlJson') return JSON.stringify(rewriteUrls(value))
   if (columnType === 'MySqlDateString') {
     return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10)
@@ -60,14 +77,65 @@ function convert(value: unknown, columnType: string): unknown {
 
 const sqlValue = (rows: unknown[][]) => format('?', [rows], false, 'Z')
 
+async function loadFromPostgres(url: string): Promise<Source> {
+  const pg = postgres(url.replace(/^﻿/, ''), { prepare: false, max: 1, ssl: 'require' })
+  const result: Source = { tables: new Map(), authUsers: [] }
+  for (const table of tables) {
+    const { name } = getTableConfig(table)
+    const [exists] = await pg`select to_regclass(${'public.' + name}) as t`
+    if (exists.t) result.tables.set(name, [...(await pg.unsafe(`select * from public."${name}"`))])
+  }
+  result.authUsers = [...(await pg`select id::text as id, encrypted_password from auth.users`)] as Source['authUsers']
+  await pg.end()
+  return result
+}
+
+// RFC 4180 CSV parser (fields may contain quotes, commas and newlines)
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++ }
+      else if (ch === '"') quoted = false
+      else field += ch
+    } else if (ch === '"') quoted = true
+    else if (ch === ',') { row.push(field); field = '' }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      row.push(field); rows.push(row); row = []; field = ''
+    } else field += ch
+  }
+  if (field || row.length) { row.push(field); rows.push(row) }
+  return rows
+}
+
+function loadFromCsv(file: string): Source {
+  const [header, ...lines] = parseCsv(fs.readFileSync(file, 'utf-8').replace(/^﻿/, ''))
+  const [ti, ji] = [header.indexOf('t'), header.indexOf('j')]
+  if (ti < 0 || ji < 0) throw new Error('CSV inesperado: precisa das colunas t, c, j')
+  const result: Source = { tables: new Map(), authUsers: [] }
+  for (const line of lines) {
+    if (line.length < header.length) continue
+    const rows = JSON.parse(line[ji]) as Row[]
+    if (line[ti] === 'auth_users') result.authUsers.push(...(rows as Source['authUsers']))
+    else result.tables.set(line[ti], [...(result.tables.get(line[ti]) ?? []), ...rows])
+  }
+  return result
+}
+
 async function main() {
+  const csvArg = process.argv.indexOf('--csv')
   const sourceUrl = process.env.SUPABASE_DB_URL
-  if (!sourceUrl) {
-    console.error('Defina SUPABASE_DB_URL no .env.mysql.local')
+  if (csvArg < 0 && !sourceUrl) {
+    console.error('Use --csv <arquivo> ou defina SUPABASE_DB_URL no .env.mysql.local')
     process.exit(1)
   }
+  const source = csvArg >= 0 ? loadFromCsv(process.argv[csvArg + 1]) : await loadFromPostgres(sourceUrl!)
 
-  const pg = postgres(sourceUrl.replace(/^﻿/, ''), { prepare: false, max: 1, ssl: 'require' })
   const out: string[] = [
     '-- Dados do Supabase para o MySQL do Descomplicando OAB',
     `-- Gerado em ${new Date().toISOString()}`,
@@ -78,8 +146,7 @@ async function main() {
   ]
 
   // Passwords: bcrypt hashes from Supabase Auth (same format our login uses)
-  const authUsers = await pg`select id::text as id, encrypted_password from auth.users`
-  const passwordByAuthId = new Map(authUsers.map((u) => [u.id as string, (u.encrypted_password as string) || null]))
+  const passwordByAuthId = new Map(source.authUsers.map((u) => [u.id, u.encrypted_password || null]))
 
   const report: Array<{ tabela: string; registros: number }> = []
   let semSenha = 0
@@ -88,14 +155,13 @@ async function main() {
     const { name, columns } = getTableConfig(table)
     out.push(`-- ${name}`, `DELETE FROM \`${name}\`;`)
 
-    const [exists] = await pg`select to_regclass(${'public.' + name}) as t`
-    if (!exists.t) {
+    const rows = source.tables.get(name) ?? []
+    if (rows.length === 0) {
       report.push({ tabela: name, registros: 0 })
       continue
     }
 
-    const rows = await pg.unsafe(`select * from public."${name}"`)
-    const sourceColumns = new Set(rows.columns.map((c) => c.name))
+    const sourceColumns = new Set(rows.flatMap((row) => Object.keys(row)))
     const cols = columns.filter((c) => sourceColumns.has(c.name) || (name === 'users' && c.name === 'password_hash'))
     const colList = cols.map((c) => `\`${c.name}\``).join(', ')
 
@@ -128,7 +194,6 @@ async function main() {
   }
 
   out.push('', 'SET FOREIGN_KEY_CHECKS = 1;', '')
-  await pg.end()
 
   fs.writeFileSync(OUTPUT, zlib.gzipSync(out.join('\n')))
 

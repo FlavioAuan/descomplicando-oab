@@ -10,13 +10,12 @@ O login usa o próprio banco e os arquivos ficam numa pasta (volume) do site. Na
 
 ---
 
-## Passo 1 — Senha do banco do Supabase (~5 min)
+## Passo 1 — Dados do Supabase ✅ pronto
 
-Eu já peguei no Supabase o endereço de conexão e a URL do projeto. Só falta a **senha do banco**, que o Supabase não mostra (a que estava no `scripts/test-db2.js` é antiga e não funciona mais).
-
-- [ ] No Supabase ➜ **Project Settings ➜ Database ➜ Reset database password** ➜ gere uma senha nova e copie.
-- [ ] 💬 Me envie a senha aqui. Eu gero o arquivo **`supabase-dados.sql.gz`** com todos os dados (incluindo as senhas dos alunos, já no formato do login novo). Esse arquivo fica só no seu computador, fora do GitHub.
+- [x] O arquivo **`supabase-dados.sql.gz`** já foi gerado na pasta do projeto (3.680 questões, 46 provas, 3 usuários com senha, treinamento, apostila etc.). Ele fica só no seu computador, fora do GitHub.
 - [ ] Separe as chaves de IA que você usa hoje: `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`.
+
+> Se entrarem dados novos no site antigo antes da troca, 💬 me peça um arquivo atualizado.
 
 ---
 

@@ -24,7 +24,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { QuestionEditDialog } from '@/components/admin/question-edit-dialog'
+import { QuestionEditDialog, type ClassificationOptions } from '@/components/admin/question-edit-dialog'
 
 type Question = {
   id: string
@@ -38,10 +38,13 @@ type Question = {
   subjectId: string | null
   subjectName: string | null
   subjectColor: string | null
+  subsubjectId: string | null
   subsubjectName: string | null
+  microtopicId: string | null
+  microtopicName: string | null
 }
 
-type Subject = { id: string; name: string; color: string | null }
+type Subject = ClassificationOptions['subjects'][number]
 type ExamRef = { examNumber: number; year: number }
 
 interface Filters {
@@ -54,6 +57,8 @@ interface Filters {
 interface QuestionsViewProps {
   questions: Question[]
   subjects: Subject[]
+  subsubjects: ClassificationOptions['subsubjects']
+  microtopics: ClassificationOptions['microtopics']
   exams: ExamRef[]
   total: number
   page: number
@@ -84,7 +89,7 @@ function AnswerBadge({ answer }: { answer: string }) {
   )
 }
 
-function QuestionRow({ q: initial }: { q: Question }) {
+function QuestionRow({ q: initial, options }: { q: Question; options: ClassificationOptions }) {
   const [expanded, setExpanded] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [q, setQ] = useState(initial)
@@ -135,6 +140,9 @@ function QuestionRow({ q: initial }: { q: Question }) {
               )}
               {q.subsubjectName && (
                 <span className="text-xs text-gray-500">· {q.subsubjectName}</span>
+              )}
+              {q.microtopicName && (
+                <span className="text-xs text-gray-400">· {q.microtopicName}</span>
               )}
             </div>
           </div>
@@ -196,9 +204,19 @@ function QuestionRow({ q: initial }: { q: Question }) {
           open={editOpen}
           onClose={() => setEditOpen(false)}
           question={q}
-          onSaved={(patch) =>
-            setQ((prev) => ({ ...prev, ...patch }))
-          }
+          options={options}
+          onSaved={(patch) => {
+            const subject = options.subjects.find((s) => s.id === patch.subjectId)
+            setQ((prev) => ({
+              ...prev,
+              ...patch,
+              classified: !!patch.subjectId,
+              subjectName: subject?.name ?? null,
+              subjectColor: subject?.color ?? null,
+              subsubjectName: options.subsubjects.find((s) => s.id === patch.subsubjectId)?.name ?? null,
+              microtopicName: options.microtopics.find((m) => m.id === patch.microtopicId)?.name ?? null,
+            }))
+          }}
         />
       )}
     </>
@@ -208,6 +226,8 @@ function QuestionRow({ q: initial }: { q: Question }) {
 export function QuestionsView({
   questions,
   subjects,
+  subsubjects,
+  microtopics,
   exams,
   total,
   page,
@@ -392,7 +412,7 @@ export function QuestionsView({
       ) : (
         <div className="space-y-2">
           {questions.map((q) => (
-            <QuestionRow key={q.id} q={q} />
+            <QuestionRow key={q.id} q={q} options={{ subjects, subsubjects, microtopics }} />
           ))}
         </div>
       )}

@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { requireRole } from '@/server/actions/auth'
-import { db, examQuestions, exams, subjects, subsubjects } from '@/lib/db'
+import { db, examQuestions, exams, subjects, subsubjects, microtopics } from '@/lib/db'
 import { eq, and, asc, desc, sql } from 'drizzle-orm'
 import { QuestionsView } from '@/components/admin/questions-view'
 
@@ -36,11 +36,21 @@ export default async function QuestionsPage({
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
-  const [allSubjects, allExams, countResult, questions] = await Promise.all([
+  const [allSubjects, allSubsubjects, allMicrotopics, allExams, countResult, questions] = await Promise.all([
     db
       .select({ id: subjects.id, name: subjects.name, color: subjects.color })
       .from(subjects)
       .orderBy(subjects.name),
+
+    db
+      .select({ id: subsubjects.id, subjectId: subsubjects.subjectId, name: subsubjects.name })
+      .from(subsubjects)
+      .orderBy(subsubjects.name),
+
+    db
+      .select({ id: microtopics.id, subsubjectId: microtopics.subsubjectId, name: microtopics.name })
+      .from(microtopics)
+      .orderBy(microtopics.name),
 
     db
       .select({ examNumber: exams.examNumber, year: exams.year })
@@ -66,12 +76,16 @@ export default async function QuestionsPage({
         subjectId: examQuestions.subjectId,
         subjectName: subjects.name,
         subjectColor: subjects.color,
+        subsubjectId: examQuestions.subsubjectId,
         subsubjectName: subsubjects.name,
+        microtopicId: examQuestions.microtopicId,
+        microtopicName: microtopics.name,
       })
       .from(examQuestions)
       .innerJoin(exams, eq(examQuestions.examId, exams.id))
       .leftJoin(subjects, eq(examQuestions.subjectId, subjects.id))
       .leftJoin(subsubjects, eq(examQuestions.subsubjectId, subsubjects.id))
+      .leftJoin(microtopics, eq(examQuestions.microtopicId, microtopics.id))
       .where(whereClause)
       .orderBy(desc(exams.examNumber), asc(examQuestions.number))
       .limit(PAGE_SIZE)
@@ -82,6 +96,8 @@ export default async function QuestionsPage({
     <QuestionsView
       questions={questions}
       subjects={allSubjects}
+      subsubjects={allSubsubjects}
+      microtopics={allMicrotopics}
       exams={allExams}
       total={countResult[0]?.count ?? 0}
       page={page}

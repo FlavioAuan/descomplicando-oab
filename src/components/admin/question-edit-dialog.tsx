@@ -21,10 +21,26 @@ import { cn } from '@/lib/utils'
 
 type Alts = { a: string; b: string; c: string; d: string }
 
+export type ClassificationOptions = {
+  subjects: { id: string; name: string; color: string | null }[]
+  subsubjects: { id: string; subjectId: string; name: string }[]
+  microtopics: { id: string; subsubjectId: string; name: string }[]
+}
+
+export type QuestionEditPatch = {
+  statement: string
+  alternatives: Alts
+  correctAnswer: string
+  subjectId: string | null
+  subsubjectId: string | null
+  microtopicId: string | null
+}
+
 interface QuestionEditDialogProps {
   open: boolean
   onClose: () => void
-  onSaved: (patch: { statement: string; alternatives: Alts; correctAnswer: string }) => void
+  onSaved: (patch: QuestionEditPatch) => void
+  options: ClassificationOptions
   question: {
     id: string
     number: number
@@ -33,8 +49,14 @@ interface QuestionEditDialogProps {
     statement: string
     alternatives: Alts
     correctAnswer: string
+    subjectId: string | null
+    subsubjectId: string | null
+    microtopicId: string | null
   }
 }
+
+// Radix Select doesn't accept '' as a value
+const NONE = '_none'
 
 const ALT_LABELS: { key: keyof Alts; label: string }[] = [
   { key: 'a', label: 'A)' },
@@ -47,12 +69,30 @@ export function QuestionEditDialog({
   open,
   onClose,
   onSaved,
+  options,
   question,
 }: QuestionEditDialogProps) {
   const [statement, setStatement] = useState(question.statement)
   const [alts, setAlts] = useState<Alts>({ ...question.alternatives })
   const [correct, setCorrect] = useState(question.correctAnswer?.toLowerCase() ?? 'a')
+  const [subjectId, setSubjectId] = useState(question.subjectId ?? NONE)
+  const [subsubjectId, setSubsubjectId] = useState(question.subsubjectId ?? NONE)
+  const [microtopicId, setMicrotopicId] = useState(question.microtopicId ?? NONE)
   const [saving, setSaving] = useState(false)
+
+  const subsubjectOptions = options.subsubjects.filter((s) => s.subjectId === subjectId)
+  const microtopicOptions = options.microtopics.filter((m) => m.subsubjectId === subsubjectId)
+
+  function changeSubject(value: string) {
+    setSubjectId(value)
+    setSubsubjectId(NONE)
+    setMicrotopicId(NONE)
+  }
+
+  function changeSubsubject(value: string) {
+    setSubsubjectId(value)
+    setMicrotopicId(NONE)
+  }
   const [error, setError] = useState('')
 
   function setAlt(key: keyof Alts, value: string) {
@@ -66,18 +106,23 @@ export function QuestionEditDialog({
     }
     setSaving(true)
     setError('')
+    const classification = {
+      subjectId: subjectId === NONE ? null : subjectId,
+      subsubjectId: subsubjectId === NONE ? null : subsubjectId,
+      microtopicId: microtopicId === NONE ? null : microtopicId,
+    }
     try {
       const res = await fetch(`/api/admin/questions/${question.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statement: statement.trim(), alternatives: alts, correctAnswer: correct }),
+        body: JSON.stringify({ statement: statement.trim(), alternatives: alts, correctAnswer: correct, classification }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setError(data.error ?? 'Erro ao salvar.')
         return
       }
-      onSaved({ statement: statement.trim(), alternatives: alts, correctAnswer: correct })
+      onSaved({ statement: statement.trim(), alternatives: alts, correctAnswer: correct, ...classification })
       onClose()
     } catch {
       setError('Erro de conexão.')
@@ -153,6 +198,65 @@ export function QuestionEditDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Classificação */}
+          <div className="space-y-2">
+            <Label>Classificação</Label>
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <span className="text-xs text-gray-500">Disciplina</span>
+                <Select value={subjectId} onValueChange={changeSubject}>
+                  <SelectTrigger className="text-sm text-left">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Não classificada</SelectItem>
+                    {options.subjects.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block"
+                            style={{ backgroundColor: s.color ?? '#2563EB' }}
+                          />
+                          {s.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs text-gray-500">Subtema</span>
+                <Select value={subsubjectId} onValueChange={changeSubsubject} disabled={subjectId === NONE}>
+                  <SelectTrigger className="text-sm text-left">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Nenhum</SelectItem>
+                    {subsubjectOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs text-gray-500">Microtema</span>
+                <Select value={microtopicId} onValueChange={setMicrotopicId} disabled={subsubjectId === NONE}>
+                  <SelectTrigger className="text-sm text-left">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Nenhum</SelectItem>
+                    {microtopicOptions.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
