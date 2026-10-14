@@ -40,8 +40,8 @@ type Question = {
   subjectColor: string | null
   subsubjectId: string | null
   subsubjectName: string | null
-  microtopicId: string | null
-  microtopicName: string | null
+  ebookTopicId: string | null
+  ebookTopicName: string | null
 }
 
 type Subject = ClassificationOptions['subjects'][number]
@@ -58,7 +58,7 @@ interface QuestionsViewProps {
   questions: Question[]
   subjects: Subject[]
   subsubjects: ClassificationOptions['subsubjects']
-  microtopics: ClassificationOptions['microtopics']
+  ebookTopics: ClassificationOptions['ebookTopics']
   exams: ExamRef[]
   total: number
   page: number
@@ -141,8 +141,8 @@ function QuestionRow({ q: initial, options }: { q: Question; options: Classifica
               {q.subsubjectName && (
                 <span className="text-xs text-gray-500">· {q.subsubjectName}</span>
               )}
-              {q.microtopicName && (
-                <span className="text-xs text-gray-400">· {q.microtopicName}</span>
+              {q.ebookTopicName && (
+                <span className="text-xs text-gray-400">· {q.ebookTopicName}</span>
               )}
             </div>
           </div>
@@ -214,7 +214,7 @@ function QuestionRow({ q: initial, options }: { q: Question; options: Classifica
               subjectName: subject?.name ?? null,
               subjectColor: subject?.color ?? null,
               subsubjectName: options.subsubjects.find((s) => s.id === patch.subsubjectId)?.name ?? null,
-              microtopicName: options.microtopics.find((m) => m.id === patch.microtopicId)?.name ?? null,
+              ebookTopicName: options.ebookTopics.find((t) => t.id === patch.ebookTopicId)?.name ?? null,
             }))
           }}
         />
@@ -227,7 +227,7 @@ export function QuestionsView({
   questions,
   subjects,
   subsubjects,
-  microtopics,
+  ebookTopics,
   exams,
   total,
   page,
@@ -412,7 +412,7 @@ export function QuestionsView({
       ) : (
         <div className="space-y-2">
           {questions.map((q) => (
-            <QuestionRow key={q.id} q={q} options={{ subjects, subsubjects, microtopics }} />
+            <QuestionRow key={q.id} q={q} options={{ subjects, subsubjects, ebookTopics }} />
           ))}
         </div>
       )}

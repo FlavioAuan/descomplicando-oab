@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/server/actions/auth'
-import { db, examQuestions, subsubjects, microtopics } from '@/lib/db'
+import { db, examQuestions, subsubjects, ebookTopics } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { updateReturning } from '@/lib/db/helpers'
 
@@ -19,7 +19,7 @@ export async function PATCH(
     classification?: {
       subjectId: string | null
       subsubjectId: string | null
-      microtopicId: string | null
+      ebookTopicId: string | null
     }
   }
 
@@ -33,7 +33,7 @@ export async function PATCH(
   if (body.correctAnswer !== undefined) updates.correctAnswer = body.correctAnswer.toLowerCase()
 
   if (body.classification !== undefined) {
-    const { subjectId, subsubjectId, microtopicId } = body.classification
+    const { subjectId, subsubjectId, ebookTopicId } = body.classification
 
     // Each level must belong to the level above it
     if (subsubjectId) {
@@ -42,16 +42,20 @@ export async function PATCH(
         return NextResponse.json({ error: 'Subtema não pertence à disciplina escolhida' }, { status: 400 })
       }
     }
-    if (microtopicId) {
-      const [micro] = await db.select({ subsubjectId: microtopics.subsubjectId }).from(microtopics).where(eq(microtopics.id, microtopicId)).limit(1)
-      if (!micro || !subsubjectId || micro.subsubjectId !== subsubjectId) {
-        return NextResponse.json({ error: 'Microtema não pertence ao subtema escolhido' }, { status: 400 })
+    if (ebookTopicId) {
+      const [topic] = await db.select({ subjectId: ebookTopics.subjectId }).from(ebookTopics).where(eq(ebookTopics.id, ebookTopicId)).limit(1)
+      if (!topic || topic.subjectId !== subjectId) {
+        return NextResponse.json({ error: 'Tópico do ebook não pertence à disciplina escolhida' }, { status: 400 })
       }
     }
 
+    // The old AI microtopic only makes sense under the same subtema
+    const [current] = await db.select({ subsubjectId: examQuestions.subsubjectId }).from(examQuestions).where(eq(examQuestions.id, id)).limit(1)
+    if (current && current.subsubjectId !== (subsubjectId || null)) updates.microtopicId = null
+
     updates.subjectId = subjectId || null
     updates.subsubjectId = subsubjectId || null
-    updates.microtopicId = microtopicId || null
+    updates.ebookTopicId = ebookTopicId || null
     updates.classified = !!subjectId
     updates.classifiedAt = subjectId ? new Date() : null
   }

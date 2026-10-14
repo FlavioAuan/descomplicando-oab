@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { requireRole } from '@/server/actions/auth'
-import { db, examQuestions, exams, subjects, subsubjects, microtopics } from '@/lib/db'
+import { db, examQuestions, exams, subjects, subsubjects, ebookTopics } from '@/lib/db'
 import { eq, and, asc, desc, sql } from 'drizzle-orm'
 import { QuestionsView } from '@/components/admin/questions-view'
 
@@ -36,7 +36,7 @@ export default async function QuestionsPage({
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
-  const [allSubjects, allSubsubjects, allMicrotopics, allExams, countResult, questions] = await Promise.all([
+  const [allSubjects, allSubsubjects, allEbookTopics, allExams, countResult, questions] = await Promise.all([
     db
       .select({ id: subjects.id, name: subjects.name, color: subjects.color })
       .from(subjects)
@@ -48,9 +48,9 @@ export default async function QuestionsPage({
       .orderBy(subsubjects.name),
 
     db
-      .select({ id: microtopics.id, subsubjectId: microtopics.subsubjectId, name: microtopics.name })
-      .from(microtopics)
-      .orderBy(microtopics.name),
+      .select({ id: ebookTopics.id, subjectId: ebookTopics.subjectId, name: ebookTopics.name })
+      .from(ebookTopics)
+      .orderBy(ebookTopics.order, ebookTopics.name),
 
     db
       .select({ examNumber: exams.examNumber, year: exams.year })
@@ -78,14 +78,14 @@ export default async function QuestionsPage({
         subjectColor: subjects.color,
         subsubjectId: examQuestions.subsubjectId,
         subsubjectName: subsubjects.name,
-        microtopicId: examQuestions.microtopicId,
-        microtopicName: microtopics.name,
+        ebookTopicId: examQuestions.ebookTopicId,
+        ebookTopicName: ebookTopics.name,
       })
       .from(examQuestions)
       .innerJoin(exams, eq(examQuestions.examId, exams.id))
       .leftJoin(subjects, eq(examQuestions.subjectId, subjects.id))
       .leftJoin(subsubjects, eq(examQuestions.subsubjectId, subsubjects.id))
-      .leftJoin(microtopics, eq(examQuestions.microtopicId, microtopics.id))
+      .leftJoin(ebookTopics, eq(examQuestions.ebookTopicId, ebookTopics.id))
       .where(whereClause)
       .orderBy(desc(exams.examNumber), asc(examQuestions.number))
       .limit(PAGE_SIZE)
@@ -97,7 +97,7 @@ export default async function QuestionsPage({
       questions={questions}
       subjects={allSubjects}
       subsubjects={allSubsubjects}
-      microtopics={allMicrotopics}
+      ebookTopics={allEbookTopics}
       exams={allExams}
       total={countResult[0]?.count ?? 0}
       page={page}

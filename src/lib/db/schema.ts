@@ -82,6 +82,15 @@ export const microtopics = mysqlTable('microtopics', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [index('microtopics_subsubject_idx').on(t.subsubjectId)])
 
+// Topics of each discipline's ebook, used to classify questions manually
+export const ebookTopics = mysqlTable('ebook_topics', {
+  id: id(),
+  subjectId: uuid('subject_id').notNull().references(() => subjects.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 300 }).notNull(),
+  order: integer('order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [index('ebook_topics_subject_idx').on(t.subjectId)])
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export const users = mysqlTable('users', {
@@ -128,6 +137,7 @@ export const examQuestions = mysqlTable('exam_questions', {
   subjectId: uuid('subject_id').references(() => subjects.id),
   subsubjectId: uuid('subsubject_id').references(() => subsubjects.id),
   microtopicId: uuid('microtopic_id').references(() => microtopics.id),
+  ebookTopicId: uuid('ebook_topic_id').references(() => ebookTopics.id, { onDelete: 'set null' }),
   difficulty: difficultyEnum('difficulty').default('medium'),
   classified: boolean('classified').default(false),
   classifiedAt: timestamp('classified_at'),
@@ -537,6 +547,7 @@ export const studentExerciseProgress = mysqlTable('student_exercise_progress', {
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({
   subsubjects: many(subsubjects),
+  ebookTopics: many(ebookTopics),
   questions: many(examQuestions),
   statistics: many(statistics),
 }))
@@ -550,6 +561,10 @@ export const microtopicsRelations = relations(microtopics, ({ one }) => ({
   subsubject: one(subsubjects, { fields: [microtopics.subsubjectId], references: [subsubjects.id] }),
 }))
 
+export const ebookTopicsRelations = relations(ebookTopics, ({ one }) => ({
+  subject: one(subjects, { fields: [ebookTopics.subjectId], references: [subjects.id] }),
+}))
+
 export const examsRelations = relations(exams, ({ many }) => ({
   questions: many(examQuestions),
 }))
@@ -559,6 +574,7 @@ export const examQuestionsRelations = relations(examQuestions, ({ one, many }) =
   subject: one(subjects, { fields: [examQuestions.subjectId], references: [subjects.id] }),
   subsubject: one(subsubjects, { fields: [examQuestions.subsubjectId], references: [subsubjects.id] }),
   microtopic: one(microtopics, { fields: [examQuestions.microtopicId], references: [microtopics.id] }),
+  ebookTopic: one(ebookTopics, { fields: [examQuestions.ebookTopicId], references: [ebookTopics.id] }),
   studentAnswers: many(studentAnswers),
 }))
 

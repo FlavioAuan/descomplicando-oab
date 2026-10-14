@@ -24,7 +24,7 @@ type Alts = { a: string; b: string; c: string; d: string }
 export type ClassificationOptions = {
   subjects: { id: string; name: string; color: string | null }[]
   subsubjects: { id: string; subjectId: string; name: string }[]
-  microtopics: { id: string; subsubjectId: string; name: string }[]
+  ebookTopics: { id: string; subjectId: string; name: string }[]
 }
 
 export type QuestionEditPatch = {
@@ -33,7 +33,7 @@ export type QuestionEditPatch = {
   correctAnswer: string
   subjectId: string | null
   subsubjectId: string | null
-  microtopicId: string | null
+  ebookTopicId: string | null
 }
 
 interface QuestionEditDialogProps {
@@ -51,7 +51,7 @@ interface QuestionEditDialogProps {
     correctAnswer: string
     subjectId: string | null
     subsubjectId: string | null
-    microtopicId: string | null
+    ebookTopicId: string | null
   }
 }
 
@@ -77,21 +77,20 @@ export function QuestionEditDialog({
   const [correct, setCorrect] = useState(question.correctAnswer?.toLowerCase() ?? 'a')
   const [subjectId, setSubjectId] = useState(question.subjectId ?? NONE)
   const [subsubjectId, setSubsubjectId] = useState(question.subsubjectId ?? NONE)
-  const [microtopicId, setMicrotopicId] = useState(question.microtopicId ?? NONE)
+  const [ebookTopicId, setEbookTopicId] = useState(question.ebookTopicId ?? NONE)
   const [saving, setSaving] = useState(false)
 
   const subsubjectOptions = options.subsubjects.filter((s) => s.subjectId === subjectId)
-  const microtopicOptions = options.microtopics.filter((m) => m.subsubjectId === subsubjectId)
+  const ebookTopicOptions = options.ebookTopics.filter((t) => t.subjectId === subjectId)
 
   function changeSubject(value: string) {
     setSubjectId(value)
     setSubsubjectId(NONE)
-    setMicrotopicId(NONE)
+    setEbookTopicId(NONE)
   }
 
   function changeSubsubject(value: string) {
     setSubsubjectId(value)
-    setMicrotopicId(NONE)
   }
   const [error, setError] = useState('')
 
@@ -109,7 +108,7 @@ export function QuestionEditDialog({
     const classification = {
       subjectId: subjectId === NONE ? null : subjectId,
       subsubjectId: subsubjectId === NONE ? null : subsubjectId,
-      microtopicId: microtopicId === NONE ? null : microtopicId,
+      ebookTopicId: ebookTopicId === NONE ? null : ebookTopicId,
     }
     try {
       const res = await fetch(`/api/admin/questions/${question.id}`, {
@@ -243,15 +242,15 @@ export function QuestionEditDialog({
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs text-gray-500">Microtema</span>
-                <Select value={microtopicId} onValueChange={setMicrotopicId} disabled={subsubjectId === NONE}>
+                <span className="text-xs text-gray-500">Tópico do Ebook</span>
+                <Select value={ebookTopicId} onValueChange={setEbookTopicId} disabled={subjectId === NONE}>
                   <SelectTrigger className="text-sm text-left">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>Nenhum</SelectItem>
-                    {microtopicOptions.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    {ebookTopicOptions.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

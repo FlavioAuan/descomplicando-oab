@@ -15,6 +15,13 @@
       "when": 1791486137037,
       "tag": "0001_knowledge_fulltext",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791940730270,
+      "tag": "0002_ebook_topics",
+      "breakpoints": true
     }
   ]
 }
