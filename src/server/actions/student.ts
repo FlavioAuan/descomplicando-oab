@@ -13,6 +13,7 @@ import {
 } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { awardXp, updateStreak, checkAndAwardAchievements } from '../services/gamification'
+import { computeCurrentDay } from '../services/student-training'
 import { calculateNextReview, generateCode } from '@/lib/utils'
 import { insertReturning } from '@/lib/db/helpers'
 
@@ -193,10 +194,12 @@ export async function completeTrainingTopic(params: {
     const completed = progress.completedTopics || []
 
     if (!completed.includes(params.topicId)) {
+      const completedTopics = [...completed, params.topicId]
       await db
         .update(studentTrainingProgress)
         .set({
-          completedTopics: [...completed, params.topicId],
+          completedTopics,
+          currentDay: await computeCurrentDay(params.trainingId, completedTopics),
           lastAccessedAt: new Date(),
         })
         .where(eq(studentTrainingProgress.id, progress.id))
@@ -216,7 +219,7 @@ export async function completeTrainingTopic(params: {
     await awardXp(user.id, 'COMPLETE_TRAINING_DAY')
   }
 
-  revalidatePath('/student/training')
+  revalidatePath('/student/training', 'layout')
 }
 
 export async function issueCertificate(params: {

@@ -22,7 +22,8 @@ interface TrainingProgressProps {
 }
 
 export function TrainingProgress({ progress }: TrainingProgressProps) {
-  const completedCount = progress.completedTopics?.length || 0
+  // 'enroll' is the placeholder recorded when the student starts the training
+  const completedCount = progress.completedTopics?.filter(t => t !== 'enroll').length || 0
   const dayProgress = (progress.currentDay / progress.trainingDays) * 100
 
   return (
