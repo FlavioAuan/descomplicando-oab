@@ -47,6 +47,17 @@ export class UsersRepository extends BaseRepository {
     return result[0] || null
   }
 
+  /** undefined when the user doesn't exist, null when it has no password yet. */
+  async findPasswordHashById(id: string): Promise<string | null | undefined> {
+    const result = await this.db
+      .select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
+
+    return result[0] ? result[0].passwordHash : undefined
+  }
+
   async setPassword(id: string, passwordHash: string): Promise<void> {
     await this.db
       .update(users)
