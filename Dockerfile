@@ -26,6 +26,8 @@ RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Static files served as-is (e.g. /materiais/ebook-etica-descomplicando-oab.docx)
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Applied automatically on startup (src/instrumentation.ts)
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/db/migrations ./src/lib/db/migrations
 
