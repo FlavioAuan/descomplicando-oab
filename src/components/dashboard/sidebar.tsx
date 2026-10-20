@@ -35,7 +35,8 @@ const studentLinks = [
   { href: '/student/training', icon: GraduationCap, label: 'Meu Treinamento' },
   { href: '/student/simulator', icon: ClipboardList, label: 'Simulados' },
   { href: '/student/flashcards', icon: Brain, label: 'Flashcards' },
-  { href: '/student/tutor', icon: MessageSquare, label: 'Tutor IA' },
+  // Tutor IA temporarily hidden from students; restore this line to bring it back
+  // { href: '/student/tutor', icon: MessageSquare, label: 'Tutor IA' },
   { href: '/student/errors', icon: AlertCircle, label: 'Caderno de Erros' },
   { href: '/student/certificates', icon: Trophy, label: 'Certificados' },
 ]
