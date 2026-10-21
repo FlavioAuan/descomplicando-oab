@@ -31,8 +31,11 @@ export default async function MindMapPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <Link href="/student/mind-maps" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="w-4 h-4" /> Mapas Mentais
+        <Link
+          href={`/student/mind-maps/subject/${mindMap.subjectId ?? 'outros'}`}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          <ArrowLeft className="w-4 h-4" /> Mapas da disciplina
         </Link>
         {mindMap.chapter && (
           <p className="mt-2 text-xs font-semibold tracking-wide" style={{ color: '#C9A227' }}>CAPÍTULO {mindMap.chapter}</p>

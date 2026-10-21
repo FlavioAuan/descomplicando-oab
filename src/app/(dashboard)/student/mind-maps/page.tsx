@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { asc, eq } from 'drizzle-orm'
+import { asc, count, eq, min } from 'drizzle-orm'
 import { requireUser } from '@/server/actions/auth'
 import { db, mindMaps, subjects } from '@/lib/db'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,26 +8,30 @@ import { Network } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Mapas Mentais' }
 
+// Maps without a subject are listed under this id (same as in subject/[subjectId]/page.tsx)
+const NO_SUBJECT = 'outros'
+
 export default async function MindMapsPage() {
   await requireUser()
 
-  const rows = await db
+  const groups = await db
     .select({
-      id: mindMaps.id,
-      title: mindMaps.title,
-      chapter: mindMaps.chapter,
-      imageUrl: mindMaps.imageUrl,
+      subjectId: mindMaps.subjectId,
       subjectName: subjects.name,
+      total: count(),
+      firstOrder: min(mindMaps.order),
     })
     .from(mindMaps)
     .leftJoin(subjects, eq(mindMaps.subjectId, subjects.id))
-    .orderBy(asc(subjects.name), asc(mindMaps.order))
+    .groupBy(mindMaps.subjectId, subjects.name)
+    .orderBy(asc(subjects.name))
 
-  const groups = new Map<string, typeof rows>()
-  for (const row of rows) {
-    const key = row.subjectName ?? 'Outros'
-    groups.set(key, [...(groups.get(key) ?? []), row])
-  }
+  // First map of each subject, shown as the card's cover
+  const covers = await db
+    .select({ subjectId: mindMaps.subjectId, order: mindMaps.order, imageUrl: mindMaps.imageUrl })
+    .from(mindMaps)
+  const coverOf = (g: (typeof groups)[number]) =>
+    covers.find(c => c.subjectId === g.subjectId && c.order === g.firstOrder)?.imageUrl
 
   return (
     <div className="space-y-6">
@@ -36,7 +40,7 @@ export default async function MindMapsPage() {
         <p className="text-gray-500 mt-1">Cada capítulo resumido em uma página para revisar rápido</p>
       </div>
 
-      {rows.length === 0 ? (
+      {groups.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
             <Network className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -44,26 +48,36 @@ export default async function MindMapsPage() {
           </CardContent>
         </Card>
       ) : (
-        [...groups].map(([subject, maps]) => (
-          <section key={subject} className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-800">{subject}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {maps.map(m => (
-                <Link key={m.id} href={`/student/mind-maps/${m.id}`} className="group">
-                  <Card className="overflow-hidden h-full transition-shadow group-hover:shadow-md">
-                    <img src={m.imageUrl} alt="" loading="lazy" className="w-full aspect-[1.41] object-cover object-top border-b" />
-                    <CardContent className="p-4">
-                      {m.chapter && (
-                        <p className="text-xs font-semibold tracking-wide" style={{ color: '#C9A227' }}>CAPÍTULO {m.chapter}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {groups.map(g => {
+            const cover = coverOf(g)
+            return (
+              <Link key={g.subjectId ?? NO_SUBJECT} href={`/student/mind-maps/subject/${g.subjectId ?? NO_SUBJECT}`} className="group">
+                <Card className="h-full transition-shadow group-hover:shadow-md">
+                  <CardContent className="p-6 flex gap-4">
+                    <div
+                      className="w-28 h-20 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0 border"
+                      style={{ backgroundColor: '#111827' }}
+                    >
+                      {cover ? (
+                        <img src={cover} alt="" className="w-full h-full object-cover object-top" />
+                      ) : (
+                        <Network className="w-6 h-6" style={{ color: '#C9A227' }} />
                       )}
-                      <p className="font-medium text-gray-900 group-hover:underline">{m.title}</p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </section>
-        ))
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <h2 className="font-semibold text-gray-900 group-hover:underline">{g.subjectName ?? 'Outros'}</h2>
+                      <p className="text-sm text-gray-600">
+                        {g.total} {g.total === 1 ? 'mapa mental' : 'mapas mentais'}
+                      </p>
+                      <p className="text-sm font-medium text-blue-600">Ver mapas →</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
+        </div>
       )}
     </div>
   )
