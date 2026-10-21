@@ -12,6 +12,7 @@ export type StudentTopic = {
   apostilaId: string | null
   exerciseSetId: string | null
   flashcardSetId: string | null
+  mindMapId: string | null
 }
 
 export type StudentDay = {
@@ -59,7 +60,7 @@ export async function getStudentTraining(trainingId: string, user: { id: string;
     description: day.description,
     estimatedHours: day.estimatedHours,
     topics: day.topics.map(t => {
-      const content = (t.content ?? {}) as { exerciseSetId?: string; flashcardSetId?: string }
+      const content = (t.content ?? {}) as { exerciseSetId?: string; flashcardSetId?: string; mindMapId?: string }
       return {
         id: t.id,
         order: t.order,
@@ -70,6 +71,7 @@ export async function getStudentTraining(trainingId: string, user: { id: string;
         apostilaId: apostilaByTopic.get(t.id) ?? null,
         exerciseSetId: content.exerciseSetId ?? null,
         flashcardSetId: content.flashcardSetId ?? null,
+        mindMapId: content.mindMapId ?? null,
       }
     }),
   }))

@@ -6,11 +6,12 @@ import { requireUser } from '@/server/actions/auth'
 import { getStudentTraining } from '@/server/services/student-training'
 import { getExerciseSetWithQuestions } from '@/server/actions/exercises'
 import { getFlashcardSetWithCards } from '@/server/actions/flashcard-sets'
-import { db, apostilas } from '@/lib/db'
+import { db, apostilas, mindMaps } from '@/lib/db'
 import { APOSTILA_CSS } from '@/lib/apostila-css'
 import { Card, CardContent } from '@/components/ui/card'
 import { ExercisePlayer } from '@/components/student/exercise-player'
 import { FlashcardDeck } from '@/components/student/flashcard-deck'
+import { MindMapViewer } from '@/components/student/mind-map-viewer'
 import { CompleteTopicButton } from '@/components/student/complete-topic-button'
 import { TOPIC_TYPES } from '@/components/student/training-topic-types'
 import { ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react'
@@ -34,14 +35,17 @@ export default async function TrainingTopicPage({
   const prev = allTopics[index - 1]
   const next = allTopics[index + 1]
 
-  const [apostila, exercises, flashcards] = await Promise.all([
+  const [apostila, exercises, flashcards, mindMap] = await Promise.all([
     topic.apostilaId
       ? db.select().from(apostilas).where(eq(apostilas.id, topic.apostilaId)).limit(1).then(r => r[0] ?? null)
       : null,
     topic.exerciseSetId ? getExerciseSetWithQuestions(topic.exerciseSetId) : null,
     topic.flashcardSetId ? getFlashcardSetWithCards(topic.flashcardSetId) : null,
+    topic.mindMapId
+      ? db.select().from(mindMaps).where(eq(mindMaps.id, topic.mindMapId)).limit(1).then(r => r[0] ?? null)
+      : null,
   ])
-  const hasContent = Boolean(apostila || exercises?.questions.length || flashcards?.cards.length)
+  const hasContent = Boolean(apostila || exercises?.questions.length || flashcards?.cards.length || mindMap)
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -79,6 +83,8 @@ export default async function TrainingTopicPage({
       )}
 
       {flashcards && flashcards.cards.length > 0 && <FlashcardDeck cards={flashcards.cards} />}
+
+      {mindMap && <MindMapViewer mindMap={mindMap} />}
 
       {!hasContent && (
         <Card>

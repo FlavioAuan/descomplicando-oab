@@ -44,6 +44,7 @@ const TOPIC_TYPES = [
   { value: 'simulation', label: 'Simulado',    icon: '📝' },
   { value: 'video',      label: 'Vídeoaula',   icon: '🎥' },
   { value: 'review',     label: 'Revisão',     icon: '🔄' },
+  { value: 'mind_map',   label: 'Mapa mental', icon: '🗺️' },
 ]
 
 function topicIcon(type: string) {

@@ -28,7 +28,7 @@ export type TrainingStatus = 'draft' | 'review' | 'approved' | 'archived'
 
 export type SimulationType = 'general' | 'subject' | 'topic' | 'predicted' | 'adaptive'
 
-export type TopicType = 'apostila' | 'flashcard' | 'exercise' | 'simulation' | 'video' | 'review'
+export type TopicType = 'apostila' | 'flashcard' | 'exercise' | 'simulation' | 'video' | 'review' | 'mind_map'
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 

@@ -47,6 +47,7 @@ export const topicTypeEnum = (column: string) => mysqlEnum(column, [
   'simulation',
   'video',
   'review',
+  'mind_map',
 ] as const)
 export const difficultyEnum = (column: string) => mysqlEnum(column, ['easy', 'medium', 'hard'] as const)
 export const trendEnum = (column: string) => mysqlEnum(column, ['growing', 'stable', 'declining'] as const)
@@ -303,6 +304,31 @@ export const apostilas = mysqlTable('apostilas', {
   generatedBy: varchar('generated_by', { length: 50 }).default('claude'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [index('apostilas_subject_idx').on(t.subjectId)])
+
+// ─── Mapas mentais e ebooks (biblioteca do aluno) ─────────────────────────────
+
+export const mindMaps = mysqlTable('mind_maps', {
+  id: id(),
+  subjectId: uuid('subject_id').references(() => subjects.id),
+  title: varchar('title', { length: 300 }).notNull(),
+  chapter: integer('chapter'),
+  imageUrl: text('image_url').notNull(),
+  pdfUrl: text('pdf_url'),
+  order: integer('order').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [index('mind_maps_subject_idx').on(t.subjectId)])
+
+export const ebooks = mysqlTable('ebooks', {
+  id: id(),
+  subjectId: uuid('subject_id').references(() => subjects.id),
+  title: varchar('title', { length: 300 }).notNull(),
+  description: text('description'),
+  pdfUrl: text('pdf_url').notNull(),
+  sizeBytes: integer('size_bytes'),
+  pageCount: integer('page_count'),
+  order: integer('order').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => [index('ebooks_subject_idx').on(t.subjectId)])
 
 // ─── Flashcards ────────────────────────────────────────────────────────────────
 

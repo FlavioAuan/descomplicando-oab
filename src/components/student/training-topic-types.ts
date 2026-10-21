@@ -5,4 +5,5 @@ export const TOPIC_TYPES: Record<string, { label: string; icon: string }> = {
   simulation: { label: 'Simulado',   icon: '📝' },
   video:      { label: 'Vídeoaula',  icon: '🎥' },
   review:     { label: 'Revisão',    icon: '🔄' },
+  mind_map:   { label: 'Mapa mental', icon: '🗺️' },
 }

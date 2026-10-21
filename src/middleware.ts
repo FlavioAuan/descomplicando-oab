@@ -10,7 +10,10 @@ export async function middleware(request: NextRequest) {
   const isProtectedPage = request.nextUrl.pathname.startsWith('/admin') ||
     request.nextUrl.pathname.startsWith('/super-admin') ||
     request.nextUrl.pathname.startsWith('/student') ||
-    request.nextUrl.pathname.startsWith('/dashboard')
+    request.nextUrl.pathname.startsWith('/dashboard') ||
+    // Course files in public/ (PDFs, docx) are for logged-in users only
+    request.nextUrl.pathname.startsWith('/materiais') ||
+    request.nextUrl.pathname.startsWith('/mapas-mentais')
 
   if (!session && isProtectedPage) {
     const response = NextResponse.redirect(new URL('/login', request.url))
