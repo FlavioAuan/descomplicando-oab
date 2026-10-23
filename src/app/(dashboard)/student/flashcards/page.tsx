@@ -1,7 +1,8 @@
 import { Metadata } from 'next'
 import { requireUser } from '@/server/actions/auth'
 import { db, flashcards, subjects, studentFlashcardProgress } from '@/lib/db'
-import { eq, and, sql, lte, isNull, or } from 'drizzle-orm'
+import { eq, and, sql, lte, isNull, or, inArray } from 'drizzle-orm'
+import { getAccess } from '@/server/services/access'
 import { FlashcardStudy } from '@/components/student/flashcard-study'
 
 export const metadata: Metadata = { title: 'Flashcards' }
@@ -12,6 +13,15 @@ export default async function FlashcardsPage() {
   // Get flashcards due for review (spaced repetition)
   const now = new Date()
 
+  // Flashcards that belong to a training only show up once the training is unlocked
+  const access = await getAccess(user)
+  const owned = [...access.trainingIds]
+  const visible = access.full
+    ? undefined
+    : owned.length
+      ? or(isNull(flashcards.trainingId), inArray(flashcards.trainingId, owned))
+      : isNull(flashcards.trainingId)
+
   const dueCards = await db
     .select({
       id: flashcards.id,
@@ -21,6 +31,7 @@ export default async function FlashcardsPage() {
       subject: sql<string>`(SELECT name FROM subjects WHERE id = ${flashcards.subjectId})`,
     })
     .from(flashcards)
+    .where(visible)
     .limit(20)
 
   const allSubjects = await db

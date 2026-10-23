@@ -3,11 +3,13 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/server/actions/auth'
 import { getStudentTraining } from '@/server/services/student-training'
+import { getSalesSettings } from '@/server/services/sales-settings'
+import { UnlockOptions } from '@/components/student/unlock-options'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { ArrowLeft, CheckCircle2, ChevronRight, Circle } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronRight, Circle, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TOPIC_TYPES } from '@/components/student/training-topic-types'
 
@@ -20,14 +22,14 @@ export default async function StudentTrainingDetailPage({
 }) {
   const user = await requireUser()
   const { id } = await params
-  const data = await getStudentTraining(id, user)
+  const [data, sales] = await Promise.all([getStudentTraining(id, user), getSalesSettings()])
   if (!data) notFound()
 
-  const { training, days, currentDay } = data
+  const { training, days, currentDay, owned } = data
   const allTopics = days.flatMap(d => d.topics)
   const doneCount = allTopics.filter(t => t.completed).length
   const percent = allTopics.length ? (doneCount / allTopics.length) * 100 : 0
-  const nextTopic = allTopics.find(t => !t.completed)
+  const nextTopic = allTopics.find(t => !t.completed && !t.locked)
   const current = days.find(d => d.dayNumber === currentDay) ?? days[0]
 
   return (
@@ -62,6 +64,17 @@ export default async function StudentTrainingDetailPage({
         </CardContent>
       </Card>
 
+      {!owned && (
+        <UnlockOptions
+          compact
+          title="Você está no plano gratuito"
+          trainingId={training.id}
+          trainingName={training.name}
+          priceCents={training.priceCents}
+          lifetime={{ enabled: sales.lifetimeEnabled, priceCents: sales.lifetimePriceCents }}
+        />
+      )}
+
       <Accordion type="multiple" defaultValue={current ? [current.id] : []} className="space-y-2">
         {days.map(day => {
           const dayDone = day.topics.length > 0 && day.topics.every(t => t.completed)
@@ -71,9 +84,9 @@ export default async function StudentTrainingDetailPage({
                 <div className="flex items-center gap-3 text-left w-full">
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0',
-                    dayDone ? 'bg-green-600' : day.dayNumber === currentDay ? 'bg-blue-600' : 'bg-gray-400',
+                    day.locked ? 'bg-gray-300' : dayDone ? 'bg-green-600' : day.dayNumber === currentDay ? 'bg-blue-600' : 'bg-gray-400',
                   )}>
-                    {day.dayNumber}
+                    {day.locked ? <Lock className="w-4 h-4" /> : day.dayNumber}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 truncate">{day.title}</p>
@@ -82,7 +95,11 @@ export default async function StudentTrainingDetailPage({
                       {day.estimatedHours ? ` · ${day.estimatedHours}h` : ''}
                     </p>
                   </div>
-                  {day.dayNumber === currentDay && !dayDone && <Badge className="bg-blue-600 text-white">Hoje</Badge>}
+                  {day.locked ? (
+                    <Badge variant="outline" className="text-gray-500">Bloqueado</Badge>
+                  ) : (
+                    day.dayNumber === currentDay && !dayDone && <Badge className="bg-blue-600 text-white">Hoje</Badge>
+                  )}
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -94,9 +111,11 @@ export default async function StudentTrainingDetailPage({
                       href={`/student/training/${id}/topic/${topic.id}`}
                       className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
-                      {topic.completed
-                        ? <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                        : <Circle className="w-5 h-5 text-gray-300 flex-shrink-0" />}
+                      {topic.locked
+                        ? <Lock className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                        : topic.completed
+                          ? <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                          : <Circle className="w-5 h-5 text-gray-300 flex-shrink-0" />}
                       <span className="text-lg flex-shrink-0">{TOPIC_TYPES[topic.type]?.icon ?? '📌'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-700 truncate">{topic.title}</p>

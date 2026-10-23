@@ -54,6 +54,14 @@ export const trendEnum = (column: string) => mysqlEnum(column, ['growing', 'stab
 export const fileTypeEnum = (column: string) => mysqlEnum(column, ['pdf', 'docx', 'txt', 'epub', 'pptx'] as const)
 export const videoTypeEnum = (column: string) => mysqlEnum(column, ['youtube', 'upload'] as const)
 export const importStatusEnum = (column: string) => mysqlEnum(column, ['pending', 'running', 'completed', 'failed'] as const)
+export const orderKindEnum = (column: string) => mysqlEnum(column, ['training', 'lifetime'] as const)
+export const orderStatusEnum = (column: string) => mysqlEnum(column, [
+  'pending',
+  'approved',
+  'rejected',
+  'cancelled',
+  'refunded',
+] as const)
 
 // ─── Subjects (Disciplinas) ────────────────────────────────────────────────────
 
@@ -245,6 +253,8 @@ export const trainings = mysqlTable('trainings', {
   endDate: date('end_date', { mode: 'string' }).notNull(),
   status: trainingStatusEnum('status').default('draft').notNull(),
   targetExam: integer('target_exam'),
+  // Price in cents to buy this training alone; null = not sold separately (only the lifetime plan unlocks it)
+  priceCents: integer('price_cents'),
   currentVersion: integer('current_version').default(1).notNull(),
   createdBy: uuid('created_by').notNull().references(() => users.id),
   approvedBy: uuid('approved_by').references(() => users.id),
@@ -304,6 +314,29 @@ export const apostilas = mysqlTable('apostilas', {
   generatedBy: varchar('generated_by', { length: 50 }).default('claude'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => [index('apostilas_subject_idx').on(t.subjectId)])
+
+// ─── Vendas (Mercado Pago) ────────────────────────────────────────────────────
+
+// A purchase: one training, or the lifetime plan (every lesson of every training).
+// Access is granted by approved orders.
+export const orders = mysqlTable('orders', {
+  id: id(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: orderKindEnum('kind').notNull(),
+  trainingId: uuid('training_id').references(() => trainings.id, { onDelete: 'set null' }),
+  title: varchar('title', { length: 300 }).notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  status: orderStatusEnum('status').default('pending').notNull(),
+  mpPreferenceId: varchar('mp_preference_id', { length: 100 }),
+  mpPaymentId: varchar('mp_payment_id', { length: 50 }),
+  mpStatus: varchar('mp_status', { length: 50 }),
+  paidAt: timestamp('paid_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+  index('orders_user_idx').on(t.userId),
+  index('orders_status_idx').on(t.status),
+])
 
 // ─── Mapas mentais e ebooks (biblioteca do aluno) ─────────────────────────────
 

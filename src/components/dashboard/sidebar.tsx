@@ -24,6 +24,8 @@ import {
   HelpCircle,
   Network,
   Library,
+  Crown,
+  CreditCard,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -43,6 +45,7 @@ const studentLinks = [
   // { href: '/student/tutor', icon: MessageSquare, label: 'Tutor IA' },
   { href: '/student/errors', icon: AlertCircle, label: 'Caderno de Erros' },
   { href: '/student/certificates', icon: Trophy, label: 'Certificados' },
+  { href: '/student/plans', icon: Crown, label: 'Planos' },
 ]
 
 const adminLinks = [
@@ -56,6 +59,7 @@ const adminLinks = [
   { href: '/admin/flashcards', icon: Brain, label: 'Flashcards' },
   { href: '/admin/statistics', icon: BarChart3, label: 'Estatísticas' },
   { href: '/admin/users', icon: Users, label: 'Alunos' },
+  { href: '/admin/payments', icon: CreditCard, label: 'Vendas' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações IA' },
 ]
 
@@ -70,6 +74,7 @@ const superAdminLinks = [
   { href: '/admin/materials', icon: BookMarked, label: 'Conteúdo' },
   { href: '/admin/flashcards', icon: Brain, label: 'Flashcards' },
   { href: '/admin/users', icon: Users, label: 'Usuários' },
+  { href: '/admin/payments', icon: CreditCard, label: 'Vendas' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações' },
 ]
 

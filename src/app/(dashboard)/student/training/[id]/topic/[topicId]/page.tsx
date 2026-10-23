@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { eq } from 'drizzle-orm'
 import { requireUser } from '@/server/actions/auth'
 import { getStudentTraining } from '@/server/services/student-training'
+import { getSalesSettings } from '@/server/services/sales-settings'
+import { UnlockOptions } from '@/components/student/unlock-options'
 import { getExerciseSetWithQuestions } from '@/server/actions/exercises'
 import { getFlashcardSetWithCards } from '@/server/actions/flashcard-sets'
 import { db, apostilas, mindMaps } from '@/lib/db'
@@ -34,6 +36,30 @@ export default async function TrainingTopicPage({
   const topic = allTopics[index]
   const prev = allTopics[index - 1]
   const next = allTopics[index + 1]
+
+  if (topic.locked) {
+    const sales = await getSalesSettings()
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <div>
+          <Link href={`/student/training/${id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+            <ArrowLeft className="w-4 h-4" /> Dia {topic.day.dayNumber} — {topic.day.title}
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900 mt-2">
+            {TOPIC_TYPES[topic.type]?.icon} {topic.title}
+          </h1>
+        </div>
+        <UnlockOptions
+          variant="lesson"
+          title="Continue com o treinamento completo"
+          trainingId={data.training.id}
+          trainingName={data.training.name}
+          priceCents={data.training.priceCents}
+          lifetime={{ enabled: sales.lifetimeEnabled, priceCents: sales.lifetimePriceCents }}
+        />
+      </div>
+    )
+  }
 
   const [apostila, exercises, flashcards, mindMap] = await Promise.all([
     topic.apostilaId

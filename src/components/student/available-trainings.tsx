@@ -4,17 +4,22 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { completeTrainingTopic } from '@/server/actions/student'
+import { Badge } from '@/components/ui/badge'
 import { GraduationCap, Calendar, Clock, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { formatBRL } from '@/lib/money'
 import { toast } from 'sonner'
 import type { Training } from '@/types'
+import { BuyButton } from './buy-button'
 
 interface AvailableTrainingsProps {
   trainings: Training[]
   userId: string
+  /** Trainings the user already unlocked (bought, lifetime plan or admin) */
+  ownedIds: string[]
 }
 
-export function AvailableTrainings({ trainings, userId }: AvailableTrainingsProps) {
+export function AvailableTrainings({ trainings, ownedIds }: AvailableTrainingsProps) {
   const [enrolling, setEnrolling] = useState<string | null>(null)
 
   async function enroll(trainingId: string) {
@@ -47,7 +52,14 @@ export function AvailableTrainings({ trainings, userId }: AvailableTrainingsProp
         {trainings.map(training => (
           <Card key={training.id} className="flex flex-col">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{training.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="text-base">{training.name}</CardTitle>
+                {ownedIds.includes(training.id) ? (
+                  <Badge className="bg-green-100 text-green-700 flex-shrink-0">Liberado</Badge>
+                ) : training.priceCents ? (
+                  <Badge variant="outline" className="flex-shrink-0">{formatBRL(training.priceCents)}</Badge>
+                ) : null}
+              </div>
               {training.description && (
                 <p className="text-sm text-gray-500 line-clamp-2">{training.description}</p>
               )}
@@ -66,14 +78,25 @@ export function AvailableTrainings({ trainings, userId }: AvailableTrainingsProp
               <div className="text-xs text-gray-400">
                 {formatDate(training.startDate)} até {formatDate(training.endDate)}
               </div>
-              <Button
-                className="mt-auto"
-                onClick={() => enroll(training.id)}
-                disabled={enrolling === training.id}
-              >
-                {enrolling === training.id ? 'Iniciando...' : 'Iniciar Treinamento'}
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+              <div className="mt-auto flex flex-col gap-2">
+                <Button
+                  variant={ownedIds.includes(training.id) || !training.priceCents ? 'default' : 'outline'}
+                  onClick={() => enroll(training.id)}
+                  disabled={enrolling === training.id}
+                >
+                  {enrolling === training.id
+                    ? 'Iniciando...'
+                    : ownedIds.includes(training.id) ? 'Iniciar Treinamento' : 'Começar pela aula grátis'}
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+                {!ownedIds.includes(training.id) && training.priceCents ? (
+                  <BuyButton
+                    kind="training"
+                    trainingId={training.id}
+                    label={`Comprar por ${formatBRL(training.priceCents)}`}
+                  />
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         ))}

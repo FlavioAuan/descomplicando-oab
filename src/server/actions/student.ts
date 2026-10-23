@@ -14,6 +14,7 @@ import {
 import { eq, and, sql } from 'drizzle-orm'
 import { awardXp, updateStreak, checkAndAwardAchievements } from '../services/gamification'
 import { computeCurrentDay } from '../services/student-training'
+import { canOpenTopic } from '../services/access'
 import { calculateNextReview, generateCode } from '@/lib/utils'
 import { insertReturning } from '@/lib/db/helpers'
 
@@ -177,6 +178,10 @@ export async function completeTrainingTopic(params: {
   topicId: string
 }) {
   const user = await requireUser()
+  // 'enroll' only starts the training; real topics must be unlocked for this user
+  if (params.topicId !== 'enroll' && !(await canOpenTopic(user, params.topicId))) {
+    throw new Error('Atividade bloqueada')
+  }
 
   const existing = await db
     .select()

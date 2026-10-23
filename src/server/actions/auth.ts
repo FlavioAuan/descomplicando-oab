@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { usersRepository } from '../repositories/users'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, verifySession } from '@/lib/auth/session'
 import { RESET_TOKEN_TTL, createResetToken, verifyResetToken } from '@/lib/auth/password-reset'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { appUrl } from '@/lib/app-url'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -89,15 +90,6 @@ export async function register(formData: FormData) {
 }
 
 // ─── Password reset ───────────────────────────────────────────────────────────
-
-async function appUrl() {
-  const configured = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/+$/, '')
-  if (configured) return configured
-  const h = await headers()
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
-  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https')
-  return `${proto}://${host}`
-}
 
 const RESET_SENT_MESSAGE =
   'Se este email estiver cadastrado, você receberá em instantes um link para criar uma nova senha.'

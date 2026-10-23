@@ -109,6 +109,7 @@ export interface Training {
   endDate: string
   status: TrainingStatus
   targetExam?: number | null
+  priceCents?: number | null
   currentVersion: number
   createdBy: string
   approvedBy?: string | null

@@ -4,6 +4,7 @@ import { trainingsRepository } from '@/server/repositories/trainings'
 import { notFound } from 'next/navigation'
 import { TrainingEditor } from '@/components/admin/training-editor'
 import { TrainingApprovalFlow } from '@/components/admin/training-approval-flow'
+import { TrainingPriceForm } from '@/components/admin/training-price-form'
 import Link from 'next/link'
 import { Printer } from 'lucide-react'
 
@@ -41,6 +42,8 @@ export default async function TrainingDetailPage({
           <TrainingApprovalFlow training={training} />
         </div>
       </div>
+
+      <TrainingPriceForm trainingId={training.id} priceCents={training.priceCents} />
 
       <TrainingEditor training={training} versions={versions} />
     </div>
