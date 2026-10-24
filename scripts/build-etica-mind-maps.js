@@ -6,7 +6,7 @@
 //     "Mapas mentais - Etica - Caps 01 a 20 (todos).pdf" each, rendered at 2.5x
 //     (PyMuPDF get_pixmap + Pillow WEBP quality 88)
 //   - public/mapas-mentais/etica/mapas-mentais-etica-completo.pdf: the source PDF
-//   - public/materiais/ebook-etica-descomplicando-oab.pdf: the ebook docx exported
+//   - content/ebooks/ebook-etica-descomplicando-oab.pdf (was public/materiais): the ebook docx exported
 //     to PDF with Word
 //
 // Usage: node scripts/build-etica-mind-maps.js
@@ -49,7 +49,7 @@ for (const c of chapters) {
   const file = path.join(ROOT, 'public/mapas-mentais/etica', `capitulo-${String(c.chapter).padStart(2, '0')}.webp`)
   if (!fs.existsSync(file)) throw new Error(`missing ${file}`)
 }
-const ebookSize = fs.statSync(path.join(ROOT, 'public', EBOOK_PDF)).size
+const ebookSize = fs.statSync(path.join(ROOT, 'content/ebooks', path.basename(EBOOK_PDF))).size
 
 const stmts = []
 

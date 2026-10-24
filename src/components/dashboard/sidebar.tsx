@@ -59,6 +59,7 @@ const adminLinks = [
   { href: '/admin/flashcards', icon: Brain, label: 'Flashcards' },
   { href: '/admin/statistics', icon: BarChart3, label: 'Estatísticas' },
   { href: '/admin/users', icon: Users, label: 'Alunos' },
+  { href: '/admin/ebooks', icon: Library, label: 'Ebooks' },
   { href: '/admin/payments', icon: CreditCard, label: 'Vendas' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações IA' },
 ]
@@ -74,6 +75,7 @@ const superAdminLinks = [
   { href: '/admin/materials', icon: BookMarked, label: 'Conteúdo' },
   { href: '/admin/flashcards', icon: Brain, label: 'Flashcards' },
   { href: '/admin/users', icon: Users, label: 'Usuários' },
+  { href: '/admin/ebooks', icon: Library, label: 'Ebooks' },
   { href: '/admin/payments', icon: CreditCard, label: 'Vendas' },
   { href: '/super-admin/settings', icon: Settings, label: 'Configurações' },
 ]

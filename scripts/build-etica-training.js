@@ -13,7 +13,7 @@
  *     classified into the chapter's ebook topic; dropped when there are none)
  *   - Flashcards (pegadinhas da FGV + frases da revisão de véspera)
  *
- * The .docx is copied to public/materiais and registered as a knowledge file,
+ * The .docx is copied to content/ebooks (private, see migration 0008) and registered as a knowledge file,
  * with one knowledge chunk per section so the AI tutor can use it.
  */
 
@@ -426,8 +426,8 @@ WHERE \`id\` = ${q(trainingId)}`)
   const header = '-- Treinamento de Ética gerado do ebook Descomplicando OAB por scripts/build-etica-training.js\n'
   fs.writeFileSync(MIGRATION, header + stmts.join('--> statement-breakpoint\n') + '\n')
 
-  fs.mkdirSync(path.join(ROOT, 'public', path.dirname(PUBLIC_FILE)), { recursive: true })
-  fs.copyFileSync(DOCX, path.join(ROOT, 'public', PUBLIC_FILE))
+  fs.mkdirSync(path.join(ROOT, 'content/ebooks'), { recursive: true })
+  fs.copyFileSync(DOCX, path.join(ROOT, 'content/ebooks', path.basename(PUBLIC_FILE)))
 
   console.log(`${days.length} dias, ${ebook.chapters.length} capítulos, ${allQuestions.length} questões do ebook, ${allCards.length} flashcards, ${chunks.length} chunks`)
   for (const ch of ebook.chapters) console.log(`  cap. ${ch.number}: ${ch.questions.length} questões, ${ch.cards.length} pegadinhas — ${ch.title}`)

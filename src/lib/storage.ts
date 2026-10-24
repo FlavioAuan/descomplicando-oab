@@ -24,3 +24,32 @@ export async function saveFile(bucket: string, key: string, data: Buffer | Array
   await writeFile(full, Buffer.isBuffer(data) ? data : new Uint8Array(data))
   return publicFileUrl(bucket, key)
 }
+
+// ─── Private files (paid ebooks) ──────────────────────────────────────────────
+// Kept in STORAGE_DIR/private, which /api/files refuses to serve; read only
+// through routes that check access.
+
+export const PRIVATE_BUCKET = 'private'
+
+export async function savePrivateFile(key: string, data: Buffer | ArrayBuffer): Promise<string> {
+  const full = resolveStoragePath(PRIVATE_BUCKET, key)
+  if (!full) throw new Error(`Invalid storage path: ${PRIVATE_BUCKET}/${key}`)
+
+  await mkdir(path.dirname(full), { recursive: true })
+  await writeFile(full, Buffer.isBuffer(data) ? data : new Uint8Array(data))
+  return `storage:${key}`
+}
+
+const BUNDLED_EBOOKS_DIR = path.resolve(process.cwd(), 'content/ebooks')
+
+/** Disk path of an ebook's file_path ("storage:<key>" or "bundled:<file>"); null when unknown. */
+export function resolveEbookFile(filePath: string): string | null {
+  const [scheme, ...rest] = filePath.split(':')
+  const ref = rest.join(':')
+  if (scheme === 'storage') return resolveStoragePath(PRIVATE_BUCKET, ...ref.split('/'))
+  if (scheme === 'bundled') {
+    const full = path.resolve(BUNDLED_EBOOKS_DIR, ref)
+    return full.startsWith(BUNDLED_EBOOKS_DIR + path.sep) ? full : null
+  }
+  return null
+}

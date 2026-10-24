@@ -33,15 +33,19 @@ export default async function CheckoutReturnPage({
     : []
 
   const status = order?.status ?? 'pending'
-  const target = order?.kind === 'training' && order.trainingId ? `/student/training/${order.trainingId}` : '/student/training'
+  const target = order?.kind === 'ebook'
+    ? '/student/ebooks'
+    : order?.kind === 'training' && order.trainingId ? `/student/training/${order.trainingId}` : '/student/training'
 
   const view = {
     approved: {
       icon: <CheckCircle2 className="w-14 h-14 text-green-600" />,
       title: 'Pagamento aprovado!',
       text: order?.kind === 'lifetime'
-        ? 'Seu Plano Vitalício está ativo: todas as aulas de todos os treinamentos foram liberadas.'
-        : `As aulas de "${order?.title}" foram liberadas.`,
+        ? 'Seu Plano Vitalício está ativo: todas as aulas de todos os treinamentos e todos os ebooks foram liberados.'
+        : order?.kind === 'ebook'
+          ? `Seu ${order.title} já está disponível em Ebooks.`
+          : `As aulas de "${order?.title}" foram liberadas.`,
     },
     pending: {
       icon: <Clock className="w-14 h-14 text-yellow-500" />,
@@ -64,7 +68,9 @@ export default async function CheckoutReturnPage({
           <p className="text-sm text-gray-600">{view.text}</p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
             <Link href={status === 'approved' ? target : '/student/plans'}>
-              <Button className="w-full">{status === 'approved' ? 'Começar a estudar' : 'Ver planos'}</Button>
+              <Button className="w-full">
+                {status !== 'approved' ? 'Ver planos' : order?.kind === 'ebook' ? 'Ler o ebook' : 'Começar a estudar'}
+              </Button>
             </Link>
             {status !== 'approved' && (
               <Link href="/student/training">

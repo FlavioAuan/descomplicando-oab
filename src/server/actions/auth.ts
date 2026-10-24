@@ -181,7 +181,8 @@ export async function getCurrentUser() {
 
 export async function requireUser() {
   const user = await getCurrentUser()
-  if (!user) redirect('/login')
+  // Clearing the cookie avoids a redirect loop when the session's user was deleted
+  if (!user) redirect('/api/auth/clear-session')
   return user
 }
 

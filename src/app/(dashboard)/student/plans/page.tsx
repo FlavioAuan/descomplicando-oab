@@ -57,7 +57,7 @@ export default async function PlansPage() {
             <Crown className="w-10 h-10 flex-shrink-0" style={{ color: '#C9A227' }} />
             <div>
               <p className="font-semibold text-gray-900">Você tem o Plano Vitalício</p>
-              <p className="text-sm text-gray-600">Todas as aulas de todos os treinamentos estão liberadas para você.</p>
+              <p className="text-sm text-gray-600">Todas as aulas de todos os treinamentos e todos os ebooks estão liberados para você.</p>
             </div>
           </CardContent>
         </Card>
@@ -72,6 +72,7 @@ export default async function PlansPage() {
               <ul className="space-y-1.5 text-sm text-gray-700">
                 {[
                   'Todas as aulas de todos os treinamentos',
+                  'Todos os ebooks em PDF',
                   'Também os treinamentos que forem lançados depois',
                   'Pagamento único, sem mensalidade',
                 ].map(item => (

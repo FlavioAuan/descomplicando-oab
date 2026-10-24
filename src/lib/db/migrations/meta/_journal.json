@@ -57,6 +57,20 @@
       "when": 1792792285547,
       "tag": "0007_sales_mercadopago",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1792799288712,
+      "tag": "0008_ebooks_store",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1792799305546,
+      "tag": "0009_ebooks_drop_public_url",
+      "breakpoints": true
     }
   ]
 }

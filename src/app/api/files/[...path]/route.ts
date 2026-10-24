@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
-import { resolveStoragePath } from '@/lib/storage'
+import { PRIVATE_BUCKET, resolveStoragePath } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +21,11 @@ const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json',
 }
 
-// Public read access, same as the old public Supabase buckets.
+// Public read access, same as the old public Supabase buckets — except the
+// private bucket (paid ebooks), which has its own access-checked route.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: segments } = await params
-  const full = resolveStoragePath(...segments)
+  const full = segments[0] === PRIVATE_BUCKET ? null : resolveStoragePath(...segments)
   if (!full) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   try {

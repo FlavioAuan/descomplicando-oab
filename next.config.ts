@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Ebook uploads (PDF) go through /api/admin/ebooks and can be large
+    middlewareClientMaxBodySize: '200mb',
   },
   images: {
     remotePatterns: [

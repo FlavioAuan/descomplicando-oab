@@ -10,7 +10,7 @@ type Props = {
   label: string
   className?: string
   variant?: 'default' | 'outline'
-} & ({ kind: 'lifetime' } | { kind: 'training'; trainingId: string })
+} & ({ kind: 'lifetime' } | { kind: 'training'; trainingId: string } | { kind: 'ebook'; ebookId: string })
 
 /** Creates the order and sends the student to the Mercado Pago checkout. */
 export function BuyButton({ label, className, variant = 'default', ...item }: Props) {
@@ -19,7 +19,11 @@ export function BuyButton({ label, className, variant = 'default', ...item }: Pr
   async function buy() {
     setLoading(true)
     const result = await startCheckout(
-      item.kind === 'lifetime' ? { kind: 'lifetime' } : { kind: 'training', trainingId: item.trainingId },
+      item.kind === 'lifetime'
+        ? { kind: 'lifetime' }
+        : item.kind === 'ebook'
+          ? { kind: 'ebook', ebookId: item.ebookId }
+          : { kind: 'training', trainingId: item.trainingId },
     )
     if ('error' in result) {
       toast.error(result.error)

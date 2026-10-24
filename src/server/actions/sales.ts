@@ -4,22 +4,23 @@ import { revalidatePath } from 'next/cache'
 import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireRole, requireUser } from './auth'
-import { db, orders, systemSettings, trainings, users } from '@/lib/db'
+import { db, ebooks, orders, systemSettings, trainings, users } from '@/lib/db'
 import { appUrl } from '@/lib/app-url'
 import { parseBRL } from '@/lib/money'
 import { MercadoPagoError, createPreference, getAccount } from '@/lib/mercadopago'
 import { SALES_KEYS, getSalesSettings, maskSecret } from '../services/sales-settings'
-import { getAccess, ownsTraining } from '../services/access'
+import { getAccess, ownsEbook, ownsTraining } from '../services/access'
 
 // ─── Student: checkout ────────────────────────────────────────────────────────
 
 const checkoutSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('lifetime') }),
   z.object({ kind: z.literal('training'), trainingId: z.string().uuid() }),
+  z.object({ kind: z.literal('ebook'), ebookId: z.string().uuid() }),
 ])
 
 export async function startCheckout(
-  input: { kind: 'lifetime' } | { kind: 'training'; trainingId: string },
+  input: { kind: 'lifetime' } | { kind: 'training'; trainingId: string } | { kind: 'ebook'; ebookId: string },
 ): Promise<{ url: string } | { error: string }> {
   const user = await requireUser()
   const parsed = checkoutSchema.safeParse(input)
@@ -32,12 +33,20 @@ export async function startCheckout(
   let title: string
   let amountCents: number
   let trainingId: string | null = null
+  let ebookId: string | null = null
 
   if (parsed.data.kind === 'lifetime') {
     if (!settings.lifetimeEnabled) return { error: 'O plano vitalício não está disponível no momento.' }
     if (access.lifetime) return { error: 'Você já tem o plano vitalício.' }
     title = 'DescomplicandOAB — Plano Vitalício'
     amountCents = settings.lifetimePriceCents
+  } else if (parsed.data.kind === 'ebook') {
+    const [ebook] = await db.select().from(ebooks).where(eq(ebooks.id, parsed.data.ebookId)).limit(1)
+    if (!ebook || !ebook.priceCents) return { error: 'Este ebook não está à venda.' }
+    if (ownsEbook(access, ebook)) return { error: 'Você já tem acesso a este ebook.' }
+    title = `Ebook — ${ebook.title}`
+    amountCents = ebook.priceCents
+    ebookId = ebook.id
   } else {
     const [training] = await db.select().from(trainings).where(eq(trainings.id, parsed.data.trainingId)).limit(1)
     if (!training || training.status !== 'approved' || !training.priceCents) {
@@ -50,7 +59,7 @@ export async function startCheckout(
   }
 
   const orderId = crypto.randomUUID()
-  await db.insert(orders).values({ id: orderId, userId: user.id, kind: parsed.data.kind, trainingId, title, amountCents })
+  await db.insert(orders).values({ id: orderId, userId: user.id, kind: parsed.data.kind, trainingId, ebookId, title, amountCents })
 
   try {
     const preference = await createPreference(settings.accessToken, {

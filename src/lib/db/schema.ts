@@ -54,7 +54,7 @@ export const trendEnum = (column: string) => mysqlEnum(column, ['growing', 'stab
 export const fileTypeEnum = (column: string) => mysqlEnum(column, ['pdf', 'docx', 'txt', 'epub', 'pptx'] as const)
 export const videoTypeEnum = (column: string) => mysqlEnum(column, ['youtube', 'upload'] as const)
 export const importStatusEnum = (column: string) => mysqlEnum(column, ['pending', 'running', 'completed', 'failed'] as const)
-export const orderKindEnum = (column: string) => mysqlEnum(column, ['training', 'lifetime'] as const)
+export const orderKindEnum = (column: string) => mysqlEnum(column, ['training', 'lifetime', 'ebook'] as const)
 export const orderStatusEnum = (column: string) => mysqlEnum(column, [
   'pending',
   'approved',
@@ -317,13 +317,14 @@ export const apostilas = mysqlTable('apostilas', {
 
 // ─── Vendas (Mercado Pago) ────────────────────────────────────────────────────
 
-// A purchase: one training, or the lifetime plan (every lesson of every training).
+// A purchase: one training, one ebook, or the lifetime plan (every lesson and ebook).
 // Access is granted by approved orders.
 export const orders = mysqlTable('orders', {
   id: id(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   kind: orderKindEnum('kind').notNull(),
   trainingId: uuid('training_id').references(() => trainings.id, { onDelete: 'set null' }),
+  ebookId: uuid('ebook_id').references(() => ebooks.id, { onDelete: 'set null' }),
   title: varchar('title', { length: 300 }).notNull(),
   amountCents: integer('amount_cents').notNull(),
   status: orderStatusEnum('status').default('pending').notNull(),
@@ -356,7 +357,14 @@ export const ebooks = mysqlTable('ebooks', {
   subjectId: uuid('subject_id').references(() => subjects.id),
   title: varchar('title', { length: 300 }).notNull(),
   description: text('description'),
-  pdfUrl: text('pdf_url').notNull(),
+  // Where the PDF lives, never web-served directly: "storage:<key>" (uploads, in
+  // STORAGE_DIR/private) or "bundled:<file>" (shipped in content/ebooks). Read via /api/ebooks/[id]/file.
+  filePath: varchar('file_path', { length: 500 }).notNull(),
+  coverUrl: text('cover_url'),
+  // Price in cents to buy the ebook alone; null = not sold separately
+  priceCents: integer('price_cents'),
+  // Buying this training also unlocks the ebook
+  trainingId: uuid('training_id').references(() => trainings.id, { onDelete: 'set null' }),
   sizeBytes: integer('size_bytes'),
   pageCount: integer('page_count'),
   order: integer('order').default(0).notNull(),
