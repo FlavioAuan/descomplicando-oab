@@ -86,7 +86,7 @@ export function AvailableTrainings({ trainings, ownedIds }: AvailableTrainingsPr
                 >
                   {enrolling === training.id
                     ? 'Iniciando...'
-                    : ownedIds.includes(training.id) ? 'Iniciar Treinamento' : 'Começar pela aula grátis'}
+                    : ownedIds.includes(training.id) ? 'Iniciar Treinamento' : 'Começar pelas aulas grátis'}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
                 {!ownedIds.includes(training.id) && training.priceCents ? (

@@ -46,7 +46,7 @@ export default async function PlansPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Planos</h1>
         <p className="text-gray-500 mt-1">
-          A conta gratuita dá acesso à aula inicial de cada treinamento. Libere o restante comprando um treinamento
+          A conta gratuita dá acesso às 2 primeiras aulas de cada treinamento. Libere o restante comprando um treinamento
           {sales.lifetimeEnabled ? ' ou com o plano vitalício' : ''}.
         </p>
       </div>

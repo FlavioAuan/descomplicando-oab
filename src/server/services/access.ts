@@ -1,8 +1,8 @@
-import { and, eq, min } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { db, orders, trainingDays, trainingTopics } from '@/lib/db'
 
 // Who can open which lessons:
-// - the first day of every training (the "aula inicial") is free for everyone;
+// - the first FREE_DAYS days of every training are free for everyone;
 // - buying a training unlocks all of its days;
 // - the lifetime plan unlocks every day of every training (and every ebook);
 // - an ebook opens when it was bought, or when its linked training was bought;
@@ -39,9 +39,16 @@ export function ownsTraining(access: Access, trainingId: string) {
   return access.full || access.trainingIds.has(trainingId)
 }
 
-/** firstDayNumber is the lowest day number of the training (its free introductory lesson). */
-export function canOpenDay(access: Access, trainingId: string, dayNumber: number, firstDayNumber: number) {
-  return dayNumber === firstDayNumber || ownsTraining(access, trainingId)
+/** How many lessons (days) at the start of each training anyone can open. */
+export const FREE_DAYS = 2
+
+/** The day numbers that are free, given all day numbers of a training. */
+export function freeDayNumbers(dayNumbers: number[]) {
+  return new Set([...dayNumbers].sort((a, b) => a - b).slice(0, FREE_DAYS))
+}
+
+export function canOpenDay(access: Access, trainingId: string, dayNumber: number, freeDays: Set<number>) {
+  return freeDays.has(dayNumber) || ownsTraining(access, trainingId)
 }
 
 /** Whether the user may open/complete a given topic (checked server-side on every write). */
@@ -54,10 +61,13 @@ export async function canOpenTopic(user: { id: string; role: string }, topicId: 
     .limit(1)
   if (!topic) return false
 
-  const [first] = await db
-    .select({ day: min(trainingDays.dayNumber) })
+  const days = await db
+    .select({ dayNumber: trainingDays.dayNumber })
     .from(trainingDays)
     .where(eq(trainingDays.trainingId, topic.trainingId))
+    .orderBy(asc(trainingDays.dayNumber))
+    .limit(FREE_DAYS)
 
-  return canOpenDay(await getAccess(user), topic.trainingId, topic.dayNumber, first?.day ?? topic.dayNumber)
+  const freeDays = freeDayNumbers(days.map(d => d.dayNumber))
+  return canOpenDay(await getAccess(user), topic.trainingId, topic.dayNumber, freeDays)
 }

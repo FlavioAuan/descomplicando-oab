@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db, apostilas, studentTrainingProgress, trainingDays, trainingTopics } from '@/lib/db'
 import { trainingsRepository } from '../repositories/trainings'
-import { canOpenDay, getAccess, ownsTraining } from './access'
+import { canOpenDay, freeDayNumbers, getAccess, ownsTraining } from './access'
 
 export type StudentTopic = {
   id: string
@@ -32,7 +32,7 @@ export type StudentDay = {
  * Training as the student sees it: days, activities with their linked content
  * and what is already completed. Null when it doesn't exist or isn't published
  * (admins can preview drafts). Days the user hasn't paid for come back locked:
- * only the first day is free.
+ * only the first days (FREE_DAYS) are free.
  */
 export async function getStudentTraining(trainingId: string, user: { id: string; role: string }) {
   const training = await trainingsRepository.findWithDays(trainingId)
@@ -57,10 +57,10 @@ export async function getStudentTraining(trainingId: string, user: { id: string;
   const apostilaByTopic = new Map(apostilaRows.map(a => [a.topicId, a.id]))
 
   const access = await getAccess(user)
-  const firstDayNumber = Math.min(...training.days.map(d => d.dayNumber))
+  const freeDays = freeDayNumbers(training.days.map(d => d.dayNumber))
 
   const days: StudentDay[] = training.days.map(day => {
-    const locked = !canOpenDay(access, trainingId, day.dayNumber, firstDayNumber)
+    const locked = !canOpenDay(access, trainingId, day.dayNumber, freeDays)
     return {
       id: day.id,
       dayNumber: day.dayNumber,

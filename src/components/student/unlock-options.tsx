@@ -29,7 +29,7 @@ export function UnlockOptions({ trainingId, trainingName, priceCents, lifetime, 
           ? 'Esta aula faz parte do treinamento completo. Assine o plano vitalício para continuar.'
           : 'Esta aula faz parte do treinamento completo, que estará disponível para compra em breve.'
   } else {
-    message = 'Na conta gratuita você tem acesso à aula inicial de cada treinamento.' + (
+    message = 'Na conta gratuita você tem acesso às 2 primeiras aulas de cada treinamento.' + (
       canBuyTraining || lifetime.enabled
         ? ' Para liberar todas as aulas, escolha uma opção:'
         : ' As demais aulas estarão à venda em breve.'

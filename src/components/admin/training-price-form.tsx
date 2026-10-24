@@ -32,7 +32,7 @@ export function TrainingPriceForm({ trainingId, priceCents }: { trainingId: stri
           <div>
             Venda deste treinamento
             <p className="text-xs font-normal text-gray-500">
-              A aula inicial (dia 1) é sempre gratuita. Em branco = não vendido avulso (só pelo plano vitalício).
+              As 2 primeiras aulas (dias 1 e 2) são sempre gratuitas. Em branco = não vendido avulso (só pelo plano vitalício).
             </p>
           </div>
         </div>
